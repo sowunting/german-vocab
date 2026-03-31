@@ -127,7 +127,7 @@
       </div>
       <button class="btn-lookup" id="btn-lk" onclick="lookup()">Look up</button>
     </div>
-    <div class="hint" id="hint">Free lookup via Wiktionary. Results are cached locally for instant repeat lookups.</div>
+    <div class="hint" id="hint">Looks up gender and translation from verbformen.com. Results cached locally for instant repeats.</div>
     <div class="err-msg" id="errmsg"></div>
     <div class="result-box" id="result-box">
       <div class="result-preview">
@@ -171,7 +171,7 @@
 
 <script>
 const KEY = 'mein-wb-v6';
-const CACHE_KEY = 'mein-wb-cache-v5';
+const CACHE_KEY = 'mein-wb-cache-v6';
 const FIXED_CATS = [
   "👨‍👩‍👧‍👦 Family & people","🏥 Professions","🐾 Animals","🏠 Home & rooms",
   "🏙️ Places in the city","🍕 Food & drink","⚽ Sports & leisure",
@@ -290,93 +290,75 @@ function saveWords(){ try{localStorage.setItem(KEY,JSON.stringify(words));}catch
 function saveCache(){ try{localStorage.setItem(CACHE_KEY,JSON.stringify(cache));}catch(e){} }
 
 let filt='all', result=null;
-
 function getAllCats(){
-  const existing=[...new Set(words.map(w=>w.cat))];
-  return [...FIXED_CATS, ...existing.filter(c=>!FIXED_CATS.includes(c))];
+  const ex=[...new Set(words.map(w=>w.cat))];
+  return [...FIXED_CATS,...ex.filter(c=>!FIXED_CATS.includes(c))];
 }
 
-// ── Wiktionary REST API (en.wiktionary.org/api/rest_v1) ───────────────────
-// This endpoint is specifically designed for browser access and supports CORS.
-// Returns JSON with language keys, each containing an array of entries with
-// partOfSpeech and definitions. Gender appears in the partOfSpeech string
-// e.g. "Noun" but more importantly in the definition HTML as gender markers.
-async function lookupWiktionary(word) {
-  // The REST v1 endpoint is the most CORS-friendly
-  const url = `https://en.wiktionary.org/api/rest_v1/page/definition/${encodeURIComponent(word)}`;
-  const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+// ── verbformen.com lookup via CORS proxy ──────────────────────────────────
+// verbformen.com has clear structured text: "noun · masculine" / "feminine" / "neutral"
+// We fetch via allorigins.win (free CORS proxy) which works from GitHub Pages.
+async function lookupVerbformen(word) {
+  // Encode special German chars in URL: ä→a3, ö→o3, ü→u3, ß→3
+  // verbformen uses this encoding for special chars in URLs
+  const urlWord = word
+    .replace(/ä/g, 'a3').replace(/Ä/g, 'A3')
+    .replace(/ö/g, 'o3').replace(/Ö/g, 'O3')
+    .replace(/ü/g, 'u3').replace(/Ü/g, 'U3')
+    .replace(/ß/g, '3');
+
+  const targetUrl = `https://www.verbformen.com/declension/nouns/${encodeURIComponent(urlWord)}.htm`;
+  // allorigins.win is a reliable free CORS proxy
+  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+
+  const res = await fetch(proxyUrl);
   if (!res.ok) return null;
   const data = await res.json();
+  const html = data.contents || '';
+  if (!html || html.length < 100) return null;
 
-  // German entries live under key "de"
-  const deEntries = data.de;
-  if (!deEntries || !deEntries.length) return null;
+  return parseVerbformen(html, word);
+}
 
+function parseVerbformen(html, word) {
+  // Strip all tags to get plain text
+  const plain = html.replace(/<script[\s\S]*?<\/script>/gi, '')
+                    .replace(/<style[\s\S]*?<\/style>/gi, '')
+                    .replace(/<[^>]+>/g, ' ')
+                    .replace(/&amp;/g, '&')
+                    .replace(/&lt;/g, '<')
+                    .replace(/&gt;/g, '>')
+                    .replace(/&nbsp;/g, ' ')
+                    .replace(/\s+/g, ' ');
+
+  // Gender: verbformen consistently writes "noun · masculine", "noun · feminine", "noun · neutral"
   let article = null;
+  if (/noun\s*[·•]\s*masculine/i.test(plain)) article = 'der';
+  else if (/noun\s*[·•]\s*feminine/i.test(plain)) article = 'die';
+  else if (/noun\s*[·•]\s*neutral/i.test(plain)) article = 'das';
+
+  // Also try "männlich", "weiblich", "sächlich" (German labels on some pages)
+  if (!article) {
+    if (/männlich/i.test(plain)) article = 'der';
+    else if (/weiblich/i.test(plain)) article = 'die';
+    else if (/sächlich/i.test(plain)) article = 'das';
+  }
+
+  // Translation: verbformen shows English after a flag icon, typically
+  // "evening, eve, night" style comma-separated list
+  // Look for the pattern after the English flag marker
   let translation = null;
-
-  for (const entry of deEntries) {
-    const pos = (entry.partOfSpeech || '').toLowerCase();
-    // Only process noun entries
-    if (!pos.includes('noun') && !pos.includes('name') && pos !== '') {
-      // still try if pos is empty
-    }
-
-    for (const def of (entry.definitions || [])) {
-      const raw = def.definition || '';
-      // Strip all HTML tags to get plain text
-      const plain = raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-
-      // Gender detection — look for explicit gender words in the definition
-      // en.wiktionary typically writes things like:
-      // "feminine noun" / "masculine noun" / "neuter noun"
-      // or has span tags like <span class="gender">f</span>
-      if (!article) {
-        // Check raw HTML for gender spans first (most reliable)
-        if (/class="[^"]*gender[^"]*"[^>]*>\s*f\s*</.test(raw) ||
-            /\bfeminine\b/i.test(plain) ||
-            raw.includes('{{f}}') || raw.includes('|f|') ||
-            /\bdie\b/.test(plain)) {
-          article = 'die';
-        } else if (/class="[^"]*gender[^"]*"[^>]*>\s*m\s*</.test(raw) ||
-            /\bmasculine\b/i.test(plain) ||
-            raw.includes('{{m}}') || raw.includes('|m|') ||
-            /\bder\b/.test(plain)) {
-          article = 'der';
-        } else if (/class="[^"]*gender[^"]*"[^>]*>\s*n\s*</.test(raw) ||
-            /\bneuter\b/i.test(plain) ||
-            raw.includes('{{n}}') || raw.includes('|n|') ||
-            /\bdas\b/.test(plain)) {
-          article = 'das';
-        }
-      }
-
-      // Translation: first clean short definition
-      if (!translation) {
-        const cleaned = plain
-          .replace(/\(.*?\)/g, '')
-          .replace(/\[.*?\]/g, '')
-          .split(/[,;]/)[0]
-          .trim();
-        if (cleaned.length > 1 && cleaned.length < 80 &&
-            /[a-zA-Z]/.test(cleaned) &&
-            !cleaned.toLowerCase().includes('wikipedia') &&
-            !cleaned.toLowerCase().includes('wiktionary')) {
-          translation = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
-        }
-      }
-
-      if (article && translation) break;
-    }
-
-    // Also check partOfSpeech field itself for gender
-    if (!article) {
-      if (/feminine/i.test(pos)) article = 'die';
-      else if (/masculine/i.test(pos)) article = 'der';
-      else if (/neuter/i.test(pos)) article = 'das';
-    }
-
-    if (article && translation) break;
+  const enMatch = plain.match(/(?:English|EN)\s+([a-zA-Z][^.!?\n]{2,80}?)(?:\s*[,;]|\s+\/)/);
+  if (enMatch) {
+    translation = enMatch[1].trim();
+  }
+  // Fallback: look for first clean English-looking definition after the word
+  if (!translation) {
+    const defMatch = plain.match(new RegExp(
+      word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') +
+      '[^a-zA-Z]{1,50}([a-zA-Z][a-zA-Z, ]{3,60}?)(?:[.,;!?\n]|$)'
+    ));
+    if (defMatch) translation = defMatch[1].trim();
   }
 
   return { article, translation };
@@ -387,16 +369,16 @@ function guessCategory(word, translation) {
   const w = word.toLowerCase();
   const t = (translation || '').toLowerCase();
   const checks = [
-    [/\b(mother|father|brother|sister|son|daughter|child|grandm|grandp|uncle|aunt|family|wife|husband|boy|girl|baby|parent|relative)\b/.test(t) || /^(mutter|vater|bruder|schwester|sohn|tochter|kind|oma|opa|onkel|tante|familie|frau|mann|junge|mädchen|baby|eltern|geschwister)/.test(w), "👨‍👩‍👧‍👦 Family & people"],
-    [/\b(teacher|doctor|lawyer|actor|artist|student|pupil|profession|worker|engineer|pilot|cook|baker|politician|chancellor|waiter|judge|musician|singer|nurse|architect|professor)\b/.test(t) || /(lehrer|arzt|anwalt|schauspieler|künstler|student|schüler|beruf|kellner|richter|ingenieur|pilot|koch|bäcker|sänger|musiker|kanzler|pfleger|architekt|professor)/.test(w), "🏥 Professions"],
-    [/\b(dog|cat|bird|fish|horse|cow|pig|sheep|rabbit|mouse|bear|wolf|fox|elephant|owl|eagle|dolphin|whale|shark|lion|tiger|animal|insect|snake|frog)\b/.test(t) || /(hund|katze|vogel|fisch|pferd|kuh|schwein|schaf|kaninchen|maus|bär|wolf|fuchs|elefant|eule|adler|delfin|wal|hai|löwe|tiger|tier|insekt|schlange|frosch)/.test(w), "🐾 Animals"],
-    [/\b(room|kitchen|bathroom|bedroom|house|apartment|wall|floor|ceiling|window|door|stairs|garden|balcony|table|chair|sofa|bed|wardrobe|shelf|lamp|carpet|mirror|furniture|toilet)\b/.test(t) || /(zimmer|küche|bad|wohnung|haus|wand|boden|decke|fenster|tür|treppe|garten|balkon|tisch|stuhl|sofa|bett|schrank|regal|lampe|teppich|spiegel|möbel|toilette)/.test(w), "🏠 Home & rooms"],
-    [/\b(station|airport|school|library|museum|cinema|hospital|pharmacy|supermarket|market|shop|restaurant|café|hotel|park|beach|stadium|church|bank|street|bridge|subway|city|store)\b/.test(t) || /(bahnhof|flughafen|schule|bibliothek|museum|kino|krankenhaus|apotheke|supermarkt|markt|laden|restaurant|café|hotel|park|strand|stadion|kirche|bank|straße|brücke|platz|u-bahn)/.test(w), "🏙️ Places in the city"],
-    [/\b(food|drink|meal|breakfast|lunch|dinner|bread|cake|cheese|milk|egg|meat|soup|salad|fruit|vegetable|wine|beer|juice|water|coffee|tea|pizza|pasta|rice|hunger|thirst|snack|butter)\b/.test(t) || /(essen|trinken|mahlzeit|frühstück|mittagessen|abendessen|brot|kuchen|käse|milch|ei|fleisch|suppe|salat|obst|gemüse|wein|bier|saft|wasser|kaffee|tee|pizza|nudel|reis|hunger|durst|butter)/.test(w), "🍕 Food & drink"],
-    [/\b(sport|football|basketball|volleyball|tennis|swimming|running|cycling|skiing|gymnastics|yoga|fitness|game|team|goal|ball|stadium|training|competition|hobby|leisure)\b/.test(t) || /(sport|fußball|basketball|volleyball|tennis|schwimmen|laufen|radfahren|skifahren|turnen|yoga|fitness|spiel|mannschaft|tor|ball|stadion|training|wettkampf|freizeit)/.test(w), "⚽ Sports & leisure"],
+    [/\b(mother|father|brother|sister|son|daughter|child|grandm|grandp|uncle|aunt|family|wife|husband|boy|girl|baby|parent)\b/.test(t) || /^(mutter|vater|bruder|schwester|sohn|tochter|kind|oma|opa|onkel|tante|familie|frau|mann|junge|mädchen|baby|eltern)/.test(w), "👨‍👩‍👧‍👦 Family & people"],
+    [/\b(teacher|doctor|lawyer|actor|artist|student|pupil|profession|worker|engineer|pilot|cook|baker|politician|chancellor|waiter|judge|musician|singer|nurse|architect|professor)\b/.test(t) || /(lehrer|arzt|anwalt|schauspieler|künstler|student|schüler|beruf|kellner|richter|ingenieur|pilot|koch|bäcker|sänger|musiker|kanzler|architekt|professor)/.test(w), "🏥 Professions"],
+    [/\b(dog|cat|bird|fish|horse|cow|pig|sheep|rabbit|mouse|bear|wolf|fox|elephant|owl|eagle|dolphin|whale|shark|lion|tiger|animal)\b/.test(t) || /(hund|katze|vogel|fisch|pferd|kuh|schwein|schaf|kaninchen|maus|bär|wolf|fuchs|elefant|eule|adler|delfin|wal|hai|löwe|tiger|tier)/.test(w), "🐾 Animals"],
+    [/\b(room|kitchen|bathroom|bedroom|house|apartment|wall|floor|ceiling|window|door|stairs|garden|balcony|table|chair|sofa|bed|wardrobe|shelf|lamp|carpet|mirror|furniture)\b/.test(t) || /(zimmer|küche|bad|wohnung|haus|wand|boden|decke|fenster|tür|treppe|garten|balkon|tisch|stuhl|sofa|bett|schrank|regal|lampe|teppich|spiegel|möbel)/.test(w), "🏠 Home & rooms"],
+    [/\b(station|airport|school|library|museum|cinema|hospital|pharmacy|supermarket|market|shop|restaurant|café|hotel|park|beach|stadium|church|bank|street|bridge|city)\b/.test(t) || /(bahnhof|flughafen|schule|bibliothek|museum|kino|krankenhaus|apotheke|supermarkt|markt|laden|restaurant|café|hotel|park|strand|stadion|kirche|bank|straße|brücke|platz)/.test(w), "🏙️ Places in the city"],
+    [/\b(food|drink|meal|breakfast|lunch|dinner|bread|cake|cheese|milk|egg|meat|soup|salad|fruit|vegetable|wine|beer|juice|water|coffee|tea|pizza|pasta|rice|hunger|thirst)\b/.test(t) || /(essen|trinken|mahlzeit|frühstück|mittagessen|abendessen|brot|kuchen|käse|milch|ei|fleisch|suppe|salat|obst|gemüse|wein|bier|saft|wasser|kaffee|tee|pizza|nudel|reis|hunger|durst)/.test(w), "🍕 Food & drink"],
+    [/\b(sport|football|basketball|volleyball|tennis|swimming|running|cycling|skiing|gymnastics|yoga|fitness|game|team|goal|ball|training|competition|leisure)\b/.test(t) || /(sport|fußball|basketball|volleyball|tennis|schwimmen|laufen|radfahren|skifahren|turnen|yoga|fitness|spiel|mannschaft|tor|ball|training|wettkampf|freizeit)/.test(w), "⚽ Sports & leisure"],
     [/\b(weather|rain|snow|sun|wind|cloud|storm|thunder|fog|ice|frost|heat|cold|sky|moon|star|nature|mountain|lake|river|sea|forest|flower|tree|plant|season|spring|summer|autumn|winter)\b/.test(t) || /(wetter|regen|schnee|sonne|wind|wolke|sturm|donner|nebel|eis|frost|hitze|kälte|himmel|mond|stern|natur|berg|see|fluss|meer|wald|blume|baum|pflanze|jahreszeit|frühling|sommer|herbst|winter)/.test(w), "🌦️ Weather & nature"],
-    [/\b(time|hour|minute|second|day|week|month|year|date|morning|noon|evening|night|monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|yesterday|tomorrow|holiday|calendar)\b/.test(t) || /(uhr|stunde|minute|sekunde|tag|woche|monat|jahr|datum|morgen|mittag|abend|nacht|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag|heute|gestern|feiertag|kalender)/.test(w), "🕐 Time & days"],
-    [/\b(money|euro|cent|coin|price|cost|bill|receipt|cash|credit|card|account|bank|ATM|salary|wage|tax|discount|currency|payment)\b/.test(t) || /(geld|euro|cent|münze|preis|kosten|rechnung|quittung|kasse|kredit|karte|konto|bank|geldautomat|gehalt|lohn|steuer|rabatt|währung|bezahlung)/.test(w), "💶 Money & everyday items"],
+    [/\b(time|hour|minute|second|day|week|month|year|date|morning|noon|evening|night|monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|holiday)\b/.test(t) || /(uhr|stunde|minute|sekunde|tag|woche|monat|jahr|datum|morgen|mittag|abend|nacht|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag|heute|feiertag)/.test(w), "🕐 Time & days"],
+    [/\b(money|euro|cent|coin|price|cost|bill|receipt|cash|credit|card|account|bank|ATM|salary|wage|tax|discount|currency)\b/.test(t) || /(geld|euro|cent|münze|preis|kosten|rechnung|quittung|kasse|kredit|karte|konto|bank|geldautomat|gehalt|lohn|steuer|rabatt|währung)/.test(w), "💶 Money & everyday items"],
   ];
   for (const [test, cat] of checks) { if (test) return cat; }
   return null;
@@ -414,18 +396,12 @@ async function lookup() {
   }
 
   setLoading(true); hideResult(); setErr('');
-
   const word = raw.charAt(0).toUpperCase() + raw.slice(1);
 
   try {
-    // Try capitalised first (standard German noun form), then lowercase
-    let wikResult = await lookupWiktionary(word);
-    if (!wikResult || (!wikResult.article && !wikResult.translation)) {
-      wikResult = await lookupWiktionary(raw.toLowerCase());
-    }
-
-    const article = wikResult?.article || null;
-    const translation = wikResult?.translation || null;
+    const vf = await lookupVerbformen(word);
+    const article = vf?.article || null;
+    const translation = vf?.translation || null;
     const cat = guessCategory(word, translation || '') || '📦 Uncategorised';
 
     const resultObj = {
@@ -441,7 +417,6 @@ async function lookup() {
     cache[cacheKey] = resultObj;
     saveCache();
     showResult(resultObj);
-
   } catch(e) {
     setErr('Lookup failed — please check your connection and try again.');
   }
@@ -466,7 +441,7 @@ function showResult(r) {
 
   const parts = [];
   if (r.fromCache) parts.push('⚡ from cache');
-  if (!r.confirmed && !r.fromCache) parts.push('⚠️ Gender not confirmed — please verify before adding');
+  if (!r.confirmed && !r.fromCache) parts.push('⚠️ Gender not found — please verify');
   if (r.noTranslation && !r.fromCache) parts.push('Translation not found — please fill in');
   const noteEl = document.getElementById('r-note');
   noteEl.textContent = parts.join(' · ');
@@ -559,7 +534,6 @@ function render() {
 
   const cats = {};
   view.forEach(w => { if (!cats[w.cat]) cats[w.cat]=[]; cats[w.cat].push(w); });
-
   const order = getAllCats();
   const sorted = Object.keys(cats).sort((a,b) => {
     const ai=order.indexOf(a), bi=order.indexOf(b);
