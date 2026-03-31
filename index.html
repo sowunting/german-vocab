@@ -127,7 +127,7 @@
       </div>
       <button class="btn-lookup" id="btn-lk" onclick="lookup()">Look up</button>
     </div>
-    <div class="hint" id="hint">Data from verbformen.com via your Cloudflare Worker. Results cached locally.</div>
+    <div class="hint" id="hint">Gender and translation from verbformen.com via your Cloudflare Worker.</div>
     <div class="err-msg" id="errmsg"></div>
     <div class="result-box" id="result-box">
       <div class="result-preview">
@@ -170,13 +170,9 @@
 <div class="toast" id="toast"></div>
 
 <script>
-// ── PASTE YOUR WORKER URL HERE after setup ────────────────────────────────
 const WORKER_URL = "https://german-vocab.sowunting.workers.dev";
-// Example: const WORKER_URL = "https://german-vocab.sowunting.workers.dev";
-// ─────────────────────────────────────────────────────────────────────────
 
 const KEY = 'mein-wb-v6';
-const CACHE_KEY = 'mein-wb-cache-v7';
 const FIXED_CATS = [
   "👨‍👩‍👧‍👦 Family & people","🏥 Professions","🐾 Animals","🏠 Home & rooms",
   "🏙️ Places in the city","🍕 Food & drink","⚽ Sports & leisure",
@@ -290,11 +286,10 @@ const DEFAULT = [
 ];
 
 let words = (() => { try { const s=localStorage.getItem(KEY); return s?JSON.parse(s):JSON.parse(JSON.stringify(DEFAULT)); } catch(e){ return JSON.parse(JSON.stringify(DEFAULT)); } })();
-let cache = (() => { try { const s=localStorage.getItem(CACHE_KEY); return s?JSON.parse(s):{}; } catch(e){ return {}; } })();
 function saveWords(){ try{localStorage.setItem(KEY,JSON.stringify(words));}catch(e){} }
-function saveCache(){ try{localStorage.setItem(CACHE_KEY,JSON.stringify(cache));}catch(e){} }
 
 let filt='all', result=null;
+
 function getAllCats(){
   const ex=[...new Set(words.map(w=>w.cat))];
   return [...FIXED_CATS,...ex.filter(c=>!FIXED_CATS.includes(c))];
@@ -323,17 +318,6 @@ async function lookup() {
   const raw = document.getElementById('inp-de').value.trim();
   if (!raw) return;
 
-  if (WORKER_URL === "PASTE_YOUR_WORKER_URL_HERE") {
-    setErr('Please add your Worker URL first — see setup instructions.');
-    return;
-  }
-
-  const cacheKey = raw.toLowerCase();
-  if (cache[cacheKey]) {
-    showResult({ ...cache[cacheKey], fromCache: true });
-    return;
-  }
-
   setLoading(true); hideResult(); setErr('');
   const word = raw.charAt(0).toUpperCase() + raw.slice(1);
 
@@ -343,7 +327,7 @@ async function lookup() {
     const data = await res.json();
 
     if (data.error === 'not_found') {
-      setErr(`"${word}" was not found in verbformen.com. Check spelling and try again.`);
+      setErr(`"${word}" was not found. Check the spelling and try again.`);
       setLoading(false);
       return;
     }
@@ -352,7 +336,7 @@ async function lookup() {
     const translation = data.translation || null;
     const cat = guessCategory(word, translation || '') || '📦 Uncategorised';
 
-    const resultObj = {
+    result = {
       article: article || 'der',
       word,
       translation: translation || '',
@@ -362,11 +346,9 @@ async function lookup() {
       noTranslation: !translation
     };
 
-    cache[cacheKey] = resultObj;
-    saveCache();
-    showResult(resultObj);
+    showResult(result);
   } catch(e) {
-    setErr('Lookup failed — please check your Worker URL and connection.');
+    setErr('Lookup failed — please check your connection and try again.');
   }
 
   setLoading(false);
@@ -380,7 +362,6 @@ function setLoading(on) {
 }
 
 function showResult(r) {
-  result = r;
   document.getElementById('r-art').textContent = r.article;
   document.getElementById('r-art').className = 'r-badge r-' + r.article;
   document.getElementById('r-word').textContent = r.word;
@@ -388,9 +369,8 @@ function showResult(r) {
   document.getElementById('r-cat').textContent = r.category || '';
 
   const parts = [];
-  if (r.fromCache) parts.push('⚡ from cache');
-  if (!r.confirmed && !r.fromCache) parts.push('⚠️ Gender not found — please verify');
-  if (r.noTranslation && !r.fromCache) parts.push('Translation not found — please fill in');
+  if (!r.confirmed) parts.push('⚠️ Gender not found — please verify');
+  if (r.noTranslation) parts.push('Translation not found — please fill in');
   const noteEl = document.getElementById('r-note');
   noteEl.textContent = parts.join(' · ');
   noteEl.style.display = parts.length ? 'block' : 'none';
