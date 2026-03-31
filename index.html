@@ -180,7 +180,7 @@
 
 <script>
 const KEY = 'mein-wb-v6';
-const CACHE_KEY = 'mein-wb-cache-v3';
+const CACHE_KEY = 'mein-wb-cache-v4';
 const FIXED_CATS = [
   "👨‍👩‍👧‍👦 Family & people","🏥 Professions","🐾 Animals","🏠 Home & rooms",
   "🏙️ Places in the city","🍕 Food & drink","⚽ Sports & leisure",
@@ -307,114 +307,103 @@ function getAllCats(){
   return [...FIXED_CATS,...extra];
 }
 
-// ── Gender suffix rules (fallback if Wiktionary has no entry) ──────────────
-function guessGender(word) {
-  const w = word.toLowerCase();
-  // Definite feminine suffixes
-  if (/in$/.test(w) && w.length > 4) return 'die';       // Lehrerin, Ärztin
-  if (/(ung|heit|keit|schaft|tät|tion|sion|ik|ur|anz|enz|age|ade|ine|ie)$/.test(w)) return 'die';
-  // Definite neuter suffixes
-  if (/(chen|lein|ment|tum|um|ium)$/.test(w)) return 'das';
-  if (/^ge/.test(w) && /(e|de|te|se)$/.test(w)) return 'das'; // Gemüse, Gebäude
-  // Definite masculine suffixes
-  if (/(er|ler|ner|ner|or|ist|ismus|ling|ig|ich|eur|ant)$/.test(w)) return 'der';
-  // Days / seasons / months → der
-  if (/(tag|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag|januar|februar|märz|april|mai|juni|juli|august|september|oktober|november|dezember|frühling|sommer|herbst|winter)$/.test(w)) return 'der';
-  return null; // unknown
+// ── Parse gender from German Wiktionary wikitext ───────────────────────────
+// de.wiktionary uses templates like {{Deutsch Substantiv Übersicht|Genus=f}}
+// or Genus 1=m/f/n, or in headword line: der/die/das
+function parseGenderFromWikitext(wikitext) {
+  // Strategy 1: Genus= field in Substantiv Übersicht template (most reliable)
+  // Matches: |Genus=f or |Genus 1=m etc.
+  const genusMatch = wikitext.match(/[|{]\s*Genus(?:\s*\d+)?\s*=\s*([mfnu])/i);
+  if (genusMatch) {
+    const g = genusMatch[1].toLowerCase();
+    if (g === 'm') return 'der';
+    if (g === 'f') return 'die';
+    if (g === 'n') return 'das';
+  }
+
+  // Strategy 2: Look for explicit article in headword/definition lines
+  // e.g. "die Oma" or "der Hund"
+  const artMatch = wikitext.match(/(?:^|\n)[^\n]*\b(der|die|das)\b[^\n]*\n/i);
+  if (artMatch) return artMatch[1].toLowerCase();
+
+  // Strategy 3: gender tags like {{f}}, {{m}}, {{n}}
+  const tagMatch = wikitext.match(/\{\{([mfn])\}\}/);
+  if (tagMatch) {
+    const g = tagMatch[1].toLowerCase();
+    if (g === 'm') return 'der';
+    if (g === 'f') return 'die';
+    if (g === 'n') return 'das';
+  }
+
+  return null;
 }
 
-// ── Category rules ────────────────────────────────────────────────────────
-function guessCategory(word, translation) {
-  const w = word.toLowerCase();
-  const t = (translation || '').toLowerCase();
+// ── Parse English translation from en.wiktionary wikitext ─────────────────
+function parseTranslationFromWikitext(wikitext) {
+  // Find German section
+  const deSection = wikitext.match(/==\s*German\s*==[\s\S]*?(?===\s*[A-Z][a-z]|$)/);
+  if (!deSection) return null;
+  const text = deSection[0];
 
-  const checks = [
-    [/^(mutter|vater|bruder|schwester|sohn|tochter|kind|oma|opa|onkel|tante|cousin|nichte|neffe|enkel|frau|mann|junge|mädchen|baby|eltern|geschwister|familie)/.test(w) || /\b(mother|father|brother|sister|son|daughter|child|grandma|grandpa|uncle|aunt|cousin|family|wife|husband|boy|girl|baby)\b/.test(t), "👨‍👩‍👧‍👦 Family & people"],
-    [/(in|er|lehrer|arzt|chef|direktor|manager|beruf|job|stelle|arbeit|kollege|mitarbeiter|chef|bürger|politiker|beamte|soldat|polizist|feuerwehr|koch|bäcker|fahrer|pilot|ingenieur|doktor|professor|student|schüler|schauspieler|künstler|musiker|sänger|kanzler|anwalt|kellner|richter)/.test(w) || /\b(teacher|doctor|lawyer|actor|artist|student|pupil|job|profession|worker|manager|engineer|pilot|cook|baker|driver|politician|chancellor|waiter|judge|musician|singer)\b/.test(t), "🏥 Professions"],
-    [/(hund|katze|vogel|fisch|pferd|kuh|schwein|schaf|ziege|kaninchen|maus|ratte|hamster|affe|löwe|tiger|bär|wolf|fuchs|reh|hirsch|elefant|giraffe|krokodil|schlange|frosch|spinne|biene|schmetterling|eule|adler|papagei|delfin|wal|hai)/.test(w) || /\b(dog|cat|bird|fish|horse|cow|pig|sheep|rabbit|mouse|bear|wolf|fox|elephant|owl|eagle|dolphin|whale|shark|lion|tiger)\b/.test(t), "🐾 Animals"],
-    [/(zimmer|küche|bad|wohnung|haus|wand|boden|decke|fenster|tür|treppe|keller|dach|garten|terrasse|balkon|flur|eingang|garage|tisch|stuhl|sofa|bett|schrank|regal|lampe|teppich|vorhang|spiegel|kissen|decke)/.test(w) || /\b(room|kitchen|bathroom|bedroom|house|apartment|wall|floor|ceiling|window|door|stairs|garden|balcony|table|chair|sofa|bed|wardrobe|shelf|lamp|carpet|mirror)\b/.test(t), "🏠 Home & rooms"],
-    [/(bahnhof|flughafen|schule|bibliothek|museum|theater|kino|krankenhaus|apotheke|supermarkt|markt|laden|geschäft|restaurant|café|bar|hotel|park|strand|stadion|kirche|rathaus|polizei|feuerwehr|post|bank|straße|platz|brücke|tunnel|bahnhof|taxistand|bushaltestelle|u-bahn)/.test(w) || /\b(station|airport|school|library|museum|cinema|hospital|pharmacy|supermarket|market|shop|store|restaurant|café|hotel|park|beach|stadium|church|police|post office|bank|street|bridge|subway)\b/.test(t), "🏙️ Places in the city"],
-    [/(essen|trinken|mahlzeit|frühstück|mittagessen|abendessen|brot|brötchen|kuchen|torte|keks|schokolade|eis|käse|butter|milch|sahne|joghurt|ei|fleisch|wurst|schinken|hühnchen|fisch|suppe|salat|gemüse|obst|apfel|banane|orange|erdbeere|tomate|kartoffel|karotte|pizza|pasta|reis|nudel|wein|bier|saft|wasser|kaffee|tee|sandwich|snack|hunger|durst)/.test(w) || /\b(food|drink|meal|breakfast|lunch|dinner|bread|cake|cheese|milk|egg|meat|soup|salad|fruit|vegetable|wine|beer|juice|water|coffee|tea|pizza|pasta|rice|hungry|thirsty)\b/.test(t), "🍕 Food & drink"],
-    [/(sport|fußball|basketball|volleyball|tennis|schwimmen|laufen|radfahren|skifahren|turnen|yoga|fitness|gym|spiel|mannschaft|tor|ball|schläger|stadion|schwimmbad|training|wettkampf)/.test(w) || /\b(sport|football|basketball|volleyball|tennis|swimming|running|cycling|skiing|gymnastics|yoga|fitness|game|team|goal|ball|stadium|training|competition)\b/.test(t), "⚽ Sports & leisure"],
-    [/(wetter|regen|schnee|sonne|wind|wolke|sturm|gewitter|blitz|donner|nebel|eis|frost|hitze|kälte|temperatur|grad|himmel|mond|stern|sonne|planet|natur|berg|see|fluss|meer|wald|wiese|blume|baum|pflanze|tier|jahreszeit|frühling|sommer|herbst|winter)/.test(w) || /\b(weather|rain|snow|sun|wind|cloud|storm|thunder|lightning|fog|ice|frost|heat|cold|temperature|sky|moon|star|nature|mountain|lake|river|sea|forest|flower|tree|plant|season|spring|summer|autumn|winter)\b/.test(t), "🌦️ Weather & nature"],
-    [/(uhr|zeit|stunde|minute|sekunde|tag|woche|monat|jahr|datum|kalender|morgen|mittag|abend|nacht|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag|heute|gestern|morgen|übermorgen|feiertag|urlaub|termin)/.test(w) || /\b(time|hour|minute|second|day|week|month|year|date|calendar|morning|noon|evening|night|monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|yesterday|tomorrow|holiday|appointment)\b/.test(t), "🕐 Time & days"],
-    [/(geld|euro|cent|münze|schein|preis|kosten|rechnung|quittung|kasse|kredit|karte|konto|bank|geldautomat|kaufen|verkaufen|bezahlen|gehalt|lohn|steuer|rabatt|angebot|wechsel|währung)/.test(w) || /\b(money|euro|cent|coin|price|cost|bill|receipt|cash|credit|card|account|bank|ATM|buy|sell|pay|salary|wage|tax|discount|offer|currency)\b/.test(t), "💶 Money & everyday items"],
-  ];
+  // Find first definition line starting with #
+  const defLines = text.match(/^#\s+(.+)$/mg);
+  if (!defLines) return null;
 
-  for (const [test, cat] of checks) {
-    if (test) return cat;
+  for (const line of defLines) {
+    let def = line.replace(/^#\s+/, '');
+    // Strip wiki markup
+    def = def.replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, '$2');
+    def = def.replace(/\[\[([^\]]+)\]\]/g, '$1');
+    def = def.replace(/\{\{[^}]+\}\}/g, '');
+    def = def.replace(/<[^>]+>/g, '');
+    def = def.replace(/[;,].*$/, '');
+    def = def.trim();
+    if (def.length > 1 && def.length < 60 && /[a-zA-Z]/.test(def)) {
+      return def.charAt(0).toUpperCase() + def.slice(1);
+    }
   }
   return null;
 }
 
-// ── Wiktionary lookup ─────────────────────────────────────────────────────
-async function fetchWiktionary(word) {
-  // Try the word as-is, then capitalised
-  const variants = [word, word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()];
+// ── Wiktionary API calls ───────────────────────────────────────────────────
+async function getGenderFromDeWiktionary(word) {
+  // Use German Wiktionary which has very structured gender data
+  const url = `https://de.wiktionary.org/w/api.php?action=parse&page=${encodeURIComponent(word)}&prop=wikitext&formatversion=2&format=json&origin=*`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const data = await res.json();
+  if (data.error || !data.parse?.wikitext) return null;
+  return parseGenderFromWikitext(data.parse.wikitext);
+}
 
-  for (const v of [...new Set(variants)]) {
-    try {
-      const url = `https://en.wiktionary.org/api/rest_v1/page/definition/${encodeURIComponent(v)}`;
-      const res = await fetch(url);
-      if (!res.ok) continue;
-      const data = await res.json();
+async function getTranslationFromEnWiktionary(word) {
+  // Use English Wiktionary for the English translation
+  const url = `https://en.wiktionary.org/w/api.php?action=parse&page=${encodeURIComponent(word)}&prop=wikitext&formatversion=2&format=json&origin=*`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const data = await res.json();
+  if (data.error || !data.parse?.wikitext) return null;
+  return parseTranslationFromWikitext(data.parse.wikitext);
+}
 
-      // Look for German section (key "de")
-      const deEntries = data.de;
-      if (!deEntries || !deEntries.length) continue;
-
-      let article = null;
-      let translation = null;
-
-      for (const entry of deEntries) {
-        // Gender is often in the partOfSpeech field or in definitions
-        const pos = (entry.partOfSpeech || '').toLowerCase();
-
-        // Try to find gender tag in definitions
-        for (const def of (entry.definitions || [])) {
-          const defText = def.definition || '';
-          // Strip HTML tags
-          const plain = defText.replace(/<[^>]+>/g, '').trim();
-
-          // Look for gender markers
-          if (!article) {
-            if (/\bmasculine\b/i.test(plain) || /\b[Dd]er\b/.test(plain)) article = 'der';
-            else if (/\bfeminine\b/i.test(plain) || /\b[Dd]ie\b/.test(plain)) article = 'die';
-            else if (/\bneuter\b/i.test(plain) || /\b[Dd]as\b/.test(plain)) article = 'das';
-          }
-
-          // First clean definition is often the translation
-          if (!translation && plain.length > 1 && plain.length < 80 && !plain.includes('{{')) {
-            // Remove parentheticals and clean up
-            translation = plain
-              .replace(/\([^)]*\)/g, '')
-              .replace(/\[[^\]]*\]/g, '')
-              .replace(/[;,].*$/, '')
-              .trim();
-            if (translation.length < 2) translation = null;
-          }
-        }
-
-        // Also check partOfSpeech for gender hints
-        if (!article) {
-          if (/masculine/i.test(pos)) article = 'der';
-          else if (/feminine/i.test(pos)) article = 'die';
-          else if (/neuter/i.test(pos)) article = 'das';
-        }
-
-        if (article && translation) break;
-      }
-
-      if (article || translation) {
-        return {
-          article,
-          translation,
-          word: v.charAt(0).toUpperCase() + v.slice(1)
-        };
-      }
-    } catch(e) {
-      continue;
-    }
+// ── Category rules ─────────────────────────────────────────────────────────
+function guessCategory(word, translation) {
+  const w = word.toLowerCase();
+  const t = (translation || '').toLowerCase();
+  const checks = [
+    [/\b(mother|father|brother|sister|son|daughter|child|grandm|grandp|uncle|aunt|family|wife|husband|boy|girl|baby|parent)\b/.test(t) || /^(mutter|vater|bruder|schwester|sohn|tochter|kind|oma|opa|onkel|tante|familie|frau|mann|junge|mädchen|baby|eltern)/.test(w), "👨‍👩‍👧‍👦 Family & people"],
+    [/\b(teacher|doctor|lawyer|actor|artist|student|pupil|job|profession|worker|engineer|pilot|cook|baker|politician|chancellor|waiter|judge|musician|singer|nurse|architect)\b/.test(t) || /(lehrer|arzt|anwalt|schauspieler|künstler|student|schüler|beruf|kellner|richter|ingenieur|pilot|koch|bäcker|sänger|musiker|kanzler|pfleger|architekt)/.test(w), "🏥 Professions"],
+    [/\b(dog|cat|bird|fish|horse|cow|pig|sheep|rabbit|mouse|bear|wolf|fox|elephant|owl|eagle|dolphin|whale|shark|lion|tiger|animal)\b/.test(t) || /(hund|katze|vogel|fisch|pferd|kuh|schwein|schaf|kaninchen|maus|bär|wolf|fuchs|elefant|eule|adler|delfin|wal|hai|löwe|tiger|tier)/.test(w), "🐾 Animals"],
+    [/\b(room|kitchen|bathroom|bedroom|house|apartment|wall|floor|ceiling|window|door|stairs|garden|balcony|table|chair|sofa|bed|wardrobe|shelf|lamp|carpet|mirror|furniture)\b/.test(t) || /(zimmer|küche|bad|wohnung|haus|wand|boden|decke|fenster|tür|treppe|garten|balkon|tisch|stuhl|sofa|bett|schrank|regal|lampe|teppich|spiegel|möbel)/.test(w), "🏠 Home & rooms"],
+    [/\b(station|airport|school|library|museum|cinema|hospital|pharmacy|supermarket|market|shop|store|restaurant|café|hotel|park|beach|stadium|church|police|bank|street|bridge|subway|city)\b/.test(t) || /(bahnhof|flughafen|schule|bibliothek|museum|kino|krankenhaus|apotheke|supermarkt|markt|laden|restaurant|café|hotel|park|strand|stadion|kirche|polizei|bank|straße|brücke|platz)/.test(w), "🏙️ Places in the city"],
+    [/\b(food|drink|meal|breakfast|lunch|dinner|bread|cake|cheese|milk|egg|meat|soup|salad|fruit|vegetable|wine|beer|juice|water|coffee|tea|pizza|pasta|rice|hungry|thirsty|snack)\b/.test(t) || /(essen|trinken|mahlzeit|frühstück|mittagessen|abendessen|brot|kuchen|käse|milch|ei|fleisch|suppe|salat|obst|gemüse|wein|bier|saft|wasser|kaffee|tee|pizza|nudel|reis|hunger|durst)/.test(w), "🍕 Food & drink"],
+    [/\b(sport|football|basketball|volleyball|tennis|swimming|running|cycling|skiing|gymnastics|yoga|fitness|game|team|goal|ball|stadium|training|competition)\b/.test(t) || /(sport|fußball|basketball|volleyball|tennis|schwimmen|laufen|radfahren|skifahren|turnen|yoga|fitness|spiel|mannschaft|tor|ball|stadion|training|wettkampf)/.test(w), "⚽ Sports & leisure"],
+    [/\b(weather|rain|snow|sun|wind|cloud|storm|thunder|lightning|fog|ice|frost|heat|cold|sky|moon|star|nature|mountain|lake|river|sea|forest|flower|tree|plant|season|spring|summer|autumn|winter)\b/.test(t) || /(wetter|regen|schnee|sonne|wind|wolke|sturm|donner|blitz|nebel|eis|frost|hitze|kälte|himmel|mond|stern|natur|berg|see|fluss|meer|wald|blume|baum|pflanze|jahreszeit|frühling|sommer|herbst|winter)/.test(w), "🌦️ Weather & nature"],
+    [/\b(time|hour|minute|second|day|week|month|year|date|calendar|morning|noon|evening|night|monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|yesterday|tomorrow|holiday)\b/.test(t) || /(uhr|stunde|minute|sekunde|tag|woche|monat|jahr|datum|kalender|morgen|mittag|abend|nacht|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag|heute|gestern|feiertag)/.test(w), "🕐 Time & days"],
+    [/\b(money|euro|cent|coin|price|cost|bill|receipt|cash|credit|card|account|bank|ATM|buy|sell|pay|salary|wage|tax|discount|currency)\b/.test(t) || /(geld|euro|cent|münze|preis|kosten|rechnung|quittung|kasse|kredit|karte|konto|bank|geldautomat|kaufen|verkaufen|bezahlen|gehalt|lohn|steuer|rabatt|währung)/.test(w), "💶 Money & everyday items"],
+  ];
+  for (const [test, cat] of checks) {
+    if (test) return cat;
   }
   return null;
 }
@@ -432,43 +421,29 @@ async function lookup() {
 
   setLoading(true); hideResult(); setErr('');
 
-  const properWord = raw.charAt(0).toUpperCase() + raw.slice(1);
+  // Always capitalise for German nouns
+  const word = raw.charAt(0).toUpperCase() + raw.slice(1);
 
   try {
-    // Try Wiktionary
-    const wikResult = await fetchWiktionary(raw);
+    // Run both API calls in parallel for speed
+    const [article, translation] = await Promise.all([
+      getGenderFromDeWiktionary(word).catch(() => null),
+      getTranslationFromEnWiktionary(word).catch(() => null)
+    ]);
 
-    let article = wikResult?.article || null;
-    let translation = wikResult?.translation || null;
-    const word = wikResult?.word || properWord;
-
-    // Fill gaps with suffix rules
-    if (!article) {
-      article = guessGender(raw);
-    }
-
-    // If still no article, we can't determine gender
-    if (!article) {
-      // Show partial result — let user fill in manually
-      article = 'der'; // default, user can change
-    }
-
-    // If no translation from Wiktionary, leave blank for user to fill
-    if (!translation) translation = '';
-
-    // Guess category
-    const cat = guessCategory(word, translation) || '📦 Uncategorised';
+    const cat = guessCategory(word, translation || '') || '📦 Uncategorised';
     const isNewCat = !FIXED_CATS.includes(cat) && cat !== '📦 Uncategorised';
+    const confirmed = !!article;
 
     const resultObj = {
-      article,
+      article: article || 'der',
       word,
-      translation,
+      translation: translation || '',
       category: cat,
       isNewCat,
       corrected: false,
       original: '',
-      fromWiktionary: !!wikResult?.article,
+      confirmed,
       noTranslation: !translation
     };
 
@@ -477,20 +452,7 @@ async function lookup() {
     showResult(resultObj);
 
   } catch(e) {
-    // Fallback: suffix rules only
-    const article = guessGender(raw) || 'der';
-    const cat = guessCategory(properWord, '') || '📦 Uncategorised';
-    showResult({
-      article,
-      word: properWord,
-      translation: '',
-      category: cat,
-      isNewCat: false,
-      corrected: false,
-      original: '',
-      fromWiktionary: false,
-      noTranslation: true
-    });
+    setErr('Lookup failed — please check your connection and try again.');
   }
 
   setLoading(false);
@@ -509,13 +471,13 @@ function showResult(r) {
   document.getElementById('r-art').textContent = r.article;
   document.getElementById('r-art').className = 'r-badge r-' + r.article;
   document.getElementById('r-word').textContent = r.word;
-  document.getElementById('r-en').textContent = r.translation || '(please fill in)';
+  document.getElementById('r-en').textContent = r.translation || '—';
   document.getElementById('r-cat').textContent = r.category || '';
 
   const noteEl = document.getElementById('r-note');
   const parts = [];
   if (r.fromCache) parts.push('⚡ from cache');
-  if (!r.fromWiktionary && !r.fromCache) parts.push('Gender estimated from suffix — please verify');
+  if (!r.confirmed && !r.fromCache) parts.push('⚠️ Gender not found in Wiktionary — please verify');
   if (r.noTranslation && !r.fromCache) parts.push('Translation not found — please fill in');
   noteEl.textContent = parts.join(' · ');
   noteEl.style.display = parts.length ? 'block' : 'none';
