@@ -55,7 +55,7 @@
   .r-dash { color: var(--ink3); }
   .r-en { color: var(--ink2); flex: 1; font-size: 14px; }
   .r-cat { font-size: 11px; color: var(--ink3); background: var(--border); padding: 2px 7px; border-radius: 8px; }
-  .r-note { width: 100%; font-size: 12px; color: var(--die-strong); font-style: italic; margin-top: 2px; display: none; }
+  .r-note { width: 100%; font-size: 12px; color: var(--ink3); font-style: italic; margin-top: 2px; display: none; }
   .result-edit { padding: 12px 14px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; border-top: 1px solid var(--border); background: var(--card); }
   .result-edit select, .result-edit input { padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--ink); font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; }
   .result-edit select:focus, .result-edit input:focus { border-color: var(--accent); }
@@ -104,10 +104,9 @@
   .pdel:hover { color: #c0392b; }
 
   .empty { text-align: center; padding: 48px; color: var(--ink3); }
-  .empty-icon { font-family: 'Playfair Display', serif; font-size: 40px; margin-bottom: 8px; }
+  .empty-icon { font-size: 40px; margin-bottom: 8px; }
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(60px); background: var(--ink); color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 13px; opacity: 0; transition: all .3s; pointer-events: none; z-index: 999; }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-  .cache-badge { font-size: 10px; color: var(--das-strong); background: var(--das); padding: 1px 6px; border-radius: 8px; }
 </style>
 </head>
 <body>
@@ -135,7 +134,7 @@
       </div>
       <button class="btn-lookup" id="btn-lk" onclick="lookup()">Look up</button>
     </div>
-    <div class="hint" id="hint">Press Enter or click Look up. Repeated lookups are instant — results are cached locally.</div>
+    <div class="hint" id="hint">Uses Wiktionary — free, no account needed. Repeated lookups are instant (cached).</div>
     <div class="err-msg" id="errmsg"></div>
 
     <div class="result-box" id="result-box">
@@ -180,13 +179,14 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const KEY = 'mein-wb-v5';
-const CACHE_KEY = 'mein-wb-cache-v2';
+const KEY = 'mein-wb-v6';
+const CACHE_KEY = 'mein-wb-cache-v3';
 const FIXED_CATS = [
   "👨‍👩‍👧‍👦 Family & people","🏥 Professions","🐾 Animals","🏠 Home & rooms",
   "🏙️ Places in the city","🍕 Food & drink","⚽ Sports & leisure",
   "🌦️ Weather & nature","🕐 Time & days","💶 Money & everyday items"
 ];
+
 const DEFAULT = [
   {art:"die",de:"Mutter",en:"mother",cat:"👨‍👩‍👧‍👦 Family & people"},
   {art:"der",de:"Vater",en:"father",cat:"👨‍👩‍👧‍👦 Family & people"},
@@ -307,75 +307,196 @@ function getAllCats(){
   return [...FIXED_CATS,...extra];
 }
 
-async function lookup(){
+// ── Gender suffix rules (fallback if Wiktionary has no entry) ──────────────
+function guessGender(word) {
+  const w = word.toLowerCase();
+  // Definite feminine suffixes
+  if (/in$/.test(w) && w.length > 4) return 'die';       // Lehrerin, Ärztin
+  if (/(ung|heit|keit|schaft|tät|tion|sion|ik|ur|anz|enz|age|ade|ine|ie)$/.test(w)) return 'die';
+  // Definite neuter suffixes
+  if (/(chen|lein|ment|tum|um|ium)$/.test(w)) return 'das';
+  if (/^ge/.test(w) && /(e|de|te|se)$/.test(w)) return 'das'; // Gemüse, Gebäude
+  // Definite masculine suffixes
+  if (/(er|ler|ner|ner|or|ist|ismus|ling|ig|ich|eur|ant)$/.test(w)) return 'der';
+  // Days / seasons / months → der
+  if (/(tag|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag|januar|februar|märz|april|mai|juni|juli|august|september|oktober|november|dezember|frühling|sommer|herbst|winter)$/.test(w)) return 'der';
+  return null; // unknown
+}
+
+// ── Category rules ────────────────────────────────────────────────────────
+function guessCategory(word, translation) {
+  const w = word.toLowerCase();
+  const t = (translation || '').toLowerCase();
+
+  const checks = [
+    [/^(mutter|vater|bruder|schwester|sohn|tochter|kind|oma|opa|onkel|tante|cousin|nichte|neffe|enkel|frau|mann|junge|mädchen|baby|eltern|geschwister|familie)/.test(w) || /\b(mother|father|brother|sister|son|daughter|child|grandma|grandpa|uncle|aunt|cousin|family|wife|husband|boy|girl|baby)\b/.test(t), "👨‍👩‍👧‍👦 Family & people"],
+    [/(in|er|lehrer|arzt|chef|direktor|manager|beruf|job|stelle|arbeit|kollege|mitarbeiter|chef|bürger|politiker|beamte|soldat|polizist|feuerwehr|koch|bäcker|fahrer|pilot|ingenieur|doktor|professor|student|schüler|schauspieler|künstler|musiker|sänger|kanzler|anwalt|kellner|richter)/.test(w) || /\b(teacher|doctor|lawyer|actor|artist|student|pupil|job|profession|worker|manager|engineer|pilot|cook|baker|driver|politician|chancellor|waiter|judge|musician|singer)\b/.test(t), "🏥 Professions"],
+    [/(hund|katze|vogel|fisch|pferd|kuh|schwein|schaf|ziege|kaninchen|maus|ratte|hamster|affe|löwe|tiger|bär|wolf|fuchs|reh|hirsch|elefant|giraffe|krokodil|schlange|frosch|spinne|biene|schmetterling|eule|adler|papagei|delfin|wal|hai)/.test(w) || /\b(dog|cat|bird|fish|horse|cow|pig|sheep|rabbit|mouse|bear|wolf|fox|elephant|owl|eagle|dolphin|whale|shark|lion|tiger)\b/.test(t), "🐾 Animals"],
+    [/(zimmer|küche|bad|wohnung|haus|wand|boden|decke|fenster|tür|treppe|keller|dach|garten|terrasse|balkon|flur|eingang|garage|tisch|stuhl|sofa|bett|schrank|regal|lampe|teppich|vorhang|spiegel|kissen|decke)/.test(w) || /\b(room|kitchen|bathroom|bedroom|house|apartment|wall|floor|ceiling|window|door|stairs|garden|balcony|table|chair|sofa|bed|wardrobe|shelf|lamp|carpet|mirror)\b/.test(t), "🏠 Home & rooms"],
+    [/(bahnhof|flughafen|schule|bibliothek|museum|theater|kino|krankenhaus|apotheke|supermarkt|markt|laden|geschäft|restaurant|café|bar|hotel|park|strand|stadion|kirche|rathaus|polizei|feuerwehr|post|bank|straße|platz|brücke|tunnel|bahnhof|taxistand|bushaltestelle|u-bahn)/.test(w) || /\b(station|airport|school|library|museum|cinema|hospital|pharmacy|supermarket|market|shop|store|restaurant|café|hotel|park|beach|stadium|church|police|post office|bank|street|bridge|subway)\b/.test(t), "🏙️ Places in the city"],
+    [/(essen|trinken|mahlzeit|frühstück|mittagessen|abendessen|brot|brötchen|kuchen|torte|keks|schokolade|eis|käse|butter|milch|sahne|joghurt|ei|fleisch|wurst|schinken|hühnchen|fisch|suppe|salat|gemüse|obst|apfel|banane|orange|erdbeere|tomate|kartoffel|karotte|pizza|pasta|reis|nudel|wein|bier|saft|wasser|kaffee|tee|sandwich|snack|hunger|durst)/.test(w) || /\b(food|drink|meal|breakfast|lunch|dinner|bread|cake|cheese|milk|egg|meat|soup|salad|fruit|vegetable|wine|beer|juice|water|coffee|tea|pizza|pasta|rice|hungry|thirsty)\b/.test(t), "🍕 Food & drink"],
+    [/(sport|fußball|basketball|volleyball|tennis|schwimmen|laufen|radfahren|skifahren|turnen|yoga|fitness|gym|spiel|mannschaft|tor|ball|schläger|stadion|schwimmbad|training|wettkampf)/.test(w) || /\b(sport|football|basketball|volleyball|tennis|swimming|running|cycling|skiing|gymnastics|yoga|fitness|game|team|goal|ball|stadium|training|competition)\b/.test(t), "⚽ Sports & leisure"],
+    [/(wetter|regen|schnee|sonne|wind|wolke|sturm|gewitter|blitz|donner|nebel|eis|frost|hitze|kälte|temperatur|grad|himmel|mond|stern|sonne|planet|natur|berg|see|fluss|meer|wald|wiese|blume|baum|pflanze|tier|jahreszeit|frühling|sommer|herbst|winter)/.test(w) || /\b(weather|rain|snow|sun|wind|cloud|storm|thunder|lightning|fog|ice|frost|heat|cold|temperature|sky|moon|star|nature|mountain|lake|river|sea|forest|flower|tree|plant|season|spring|summer|autumn|winter)\b/.test(t), "🌦️ Weather & nature"],
+    [/(uhr|zeit|stunde|minute|sekunde|tag|woche|monat|jahr|datum|kalender|morgen|mittag|abend|nacht|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag|heute|gestern|morgen|übermorgen|feiertag|urlaub|termin)/.test(w) || /\b(time|hour|minute|second|day|week|month|year|date|calendar|morning|noon|evening|night|monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|yesterday|tomorrow|holiday|appointment)\b/.test(t), "🕐 Time & days"],
+    [/(geld|euro|cent|münze|schein|preis|kosten|rechnung|quittung|kasse|kredit|karte|konto|bank|geldautomat|kaufen|verkaufen|bezahlen|gehalt|lohn|steuer|rabatt|angebot|wechsel|währung)/.test(w) || /\b(money|euro|cent|coin|price|cost|bill|receipt|cash|credit|card|account|bank|ATM|buy|sell|pay|salary|wage|tax|discount|offer|currency)\b/.test(t), "💶 Money & everyday items"],
+  ];
+
+  for (const [test, cat] of checks) {
+    if (test) return cat;
+  }
+  return null;
+}
+
+// ── Wiktionary lookup ─────────────────────────────────────────────────────
+async function fetchWiktionary(word) {
+  // Try the word as-is, then capitalised
+  const variants = [word, word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()];
+
+  for (const v of [...new Set(variants)]) {
+    try {
+      const url = `https://en.wiktionary.org/api/rest_v1/page/definition/${encodeURIComponent(v)}`;
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const data = await res.json();
+
+      // Look for German section (key "de")
+      const deEntries = data.de;
+      if (!deEntries || !deEntries.length) continue;
+
+      let article = null;
+      let translation = null;
+
+      for (const entry of deEntries) {
+        // Gender is often in the partOfSpeech field or in definitions
+        const pos = (entry.partOfSpeech || '').toLowerCase();
+
+        // Try to find gender tag in definitions
+        for (const def of (entry.definitions || [])) {
+          const defText = def.definition || '';
+          // Strip HTML tags
+          const plain = defText.replace(/<[^>]+>/g, '').trim();
+
+          // Look for gender markers
+          if (!article) {
+            if (/\bmasculine\b/i.test(plain) || /\b[Dd]er\b/.test(plain)) article = 'der';
+            else if (/\bfeminine\b/i.test(plain) || /\b[Dd]ie\b/.test(plain)) article = 'die';
+            else if (/\bneuter\b/i.test(plain) || /\b[Dd]as\b/.test(plain)) article = 'das';
+          }
+
+          // First clean definition is often the translation
+          if (!translation && plain.length > 1 && plain.length < 80 && !plain.includes('{{')) {
+            // Remove parentheticals and clean up
+            translation = plain
+              .replace(/\([^)]*\)/g, '')
+              .replace(/\[[^\]]*\]/g, '')
+              .replace(/[;,].*$/, '')
+              .trim();
+            if (translation.length < 2) translation = null;
+          }
+        }
+
+        // Also check partOfSpeech for gender hints
+        if (!article) {
+          if (/masculine/i.test(pos)) article = 'der';
+          else if (/feminine/i.test(pos)) article = 'die';
+          else if (/neuter/i.test(pos)) article = 'das';
+        }
+
+        if (article && translation) break;
+      }
+
+      if (article || translation) {
+        return {
+          article,
+          translation,
+          word: v.charAt(0).toUpperCase() + v.slice(1)
+        };
+      }
+    } catch(e) {
+      continue;
+    }
+  }
+  return null;
+}
+
+// ── Main lookup ────────────────────────────────────────────────────────────
+async function lookup() {
   const raw = document.getElementById('inp-de').value.trim();
-  if(!raw) return;
+  if (!raw) return;
 
   const cacheKey = raw.toLowerCase();
-
-  // Instant cache hit
-  if(cache[cacheKey]){
-    showResult({...cache[cacheKey], fromCache:true});
+  if (cache[cacheKey]) {
+    showResult({ ...cache[cacheKey], fromCache: true });
     return;
   }
 
   setLoading(true); hideResult(); setErr('');
 
-  const existingCats = getAllCats().join(', ');
-
-  const prompt = `You are a precise German dictionary. The user typed: "${raw}"
-
-Reply ONLY with a valid JSON object. No markdown, no prose, no backticks.
-
-Rules:
-- Correct spelling if needed (Umlauts: ä ö ü ß). Capitalise the noun.
-- "article": exactly "der", "die", or "das"
-- "word": correctly spelled and capitalised German noun
-- "translation": short English meaning, 1–5 words
-- "category": choose the single best fit from this list, using the exact string: ${existingCats}
-  OR if none fit well, create a new descriptive category with a relevant emoji (e.g. "🎨 Art & creativity", "💊 Health & body", "🚗 Transport"). Never use "Other".
-- "isNewCat": true if you invented a new category, false otherwise
-- "corrected": true if you fixed the spelling, false otherwise
-- "original": the user's original input if corrected, else ""
-- "error": "not a noun" if input is not a German noun, else ""
-
-Respond with exactly this shape:
-{"article":"","word":"","translation":"","category":"","isNewCat":false,"corrected":false,"original":"","error":""}`;
+  const properWord = raw.charAt(0).toUpperCase() + raw.slice(1);
 
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 200,
-        messages: [{role:"user", content:prompt}]
-      })
-    });
+    // Try Wiktionary
+    const wikResult = await fetchWiktionary(raw);
 
-    if(!res.ok) throw new Error('API error ' + res.status);
+    let article = wikResult?.article || null;
+    let translation = wikResult?.translation || null;
+    const word = wikResult?.word || properWord;
 
-    const data = await res.json();
-    const txt = data.content?.find(b=>b.type==='text')?.text || '';
-    const clean = txt.replace(/```json|```/g,'').trim();
-    const parsed = JSON.parse(clean);
-
-    if(parsed.error && parsed.error !== ''){
-      setErr('"' + raw + '" doesn\'t seem to be a German noun. Try another word.');
-    } else {
-      // Cache the result
-      cache[cacheKey] = parsed;
-      saveCache();
-      showResult(parsed);
+    // Fill gaps with suffix rules
+    if (!article) {
+      article = guessGender(raw);
     }
+
+    // If still no article, we can't determine gender
+    if (!article) {
+      // Show partial result — let user fill in manually
+      article = 'der'; // default, user can change
+    }
+
+    // If no translation from Wiktionary, leave blank for user to fill
+    if (!translation) translation = '';
+
+    // Guess category
+    const cat = guessCategory(word, translation) || '📦 Uncategorised';
+    const isNewCat = !FIXED_CATS.includes(cat) && cat !== '📦 Uncategorised';
+
+    const resultObj = {
+      article,
+      word,
+      translation,
+      category: cat,
+      isNewCat,
+      corrected: false,
+      original: '',
+      fromWiktionary: !!wikResult?.article,
+      noTranslation: !translation
+    };
+
+    cache[cacheKey] = resultObj;
+    saveCache();
+    showResult(resultObj);
+
   } catch(e) {
-    setErr('Lookup failed. Please check your internet connection and try again.');
+    // Fallback: suffix rules only
+    const article = guessGender(raw) || 'der';
+    const cat = guessCategory(properWord, '') || '📦 Uncategorised';
+    showResult({
+      article,
+      word: properWord,
+      translation: '',
+      category: cat,
+      isNewCat: false,
+      corrected: false,
+      original: '',
+      fromWiktionary: false,
+      noTranslation: true
+    });
   }
 
   setLoading(false);
 }
 
-function setLoading(on){
+function setLoading(on) {
   document.getElementById('spin').classList.toggle('on', on);
   document.getElementById('inp-de').classList.toggle('loading', on);
   const btn = document.getElementById('btn-lk');
@@ -383,27 +504,28 @@ function setLoading(on){
   btn.textContent = on ? '…' : 'Look up';
 }
 
-function showResult(r){
+function showResult(r) {
   result = r;
   document.getElementById('r-art').textContent = r.article;
   document.getElementById('r-art').className = 'r-badge r-' + r.article;
   document.getElementById('r-word').textContent = r.word;
-  document.getElementById('r-en').textContent = r.translation;
+  document.getElementById('r-en').textContent = r.translation || '(please fill in)';
   document.getElementById('r-cat').textContent = r.category || '';
 
   const noteEl = document.getElementById('r-note');
   const parts = [];
-  if(r.corrected) parts.push('Spelling corrected: "' + r.original + '" → "' + r.word + '"');
-  if(r.fromCache) parts.push('⚡ from cache');
+  if (r.fromCache) parts.push('⚡ from cache');
+  if (!r.fromWiktionary && !r.fromCache) parts.push('Gender estimated from suffix — please verify');
+  if (r.noTranslation && !r.fromCache) parts.push('Translation not found — please fill in');
   noteEl.textContent = parts.join(' · ');
   noteEl.style.display = parts.length ? 'block' : 'none';
 
   document.getElementById('e-art').value = r.article; syncArtSel();
-  document.getElementById('e-en').value = r.translation;
+  document.getElementById('e-en').value = r.translation || '';
   document.getElementById('e-cat').value = r.category || '';
 
   const hint = document.getElementById('new-cat-hint');
-  if(r.isNewCat){
+  if (r.isNewCat) {
     hint.textContent = '✦ New category "' + r.category + '" will be created';
     hint.style.display = 'block';
   } else {
@@ -414,68 +536,68 @@ function showResult(r){
   document.getElementById('hint').style.display = 'none';
 }
 
-function hideResult(){
+function hideResult() {
   document.getElementById('result-box').classList.remove('on');
   document.getElementById('hint').style.display = 'block';
   result = null;
 }
 
-function discard(){
+function discard() {
   document.getElementById('inp-de').value = '';
   hideResult(); setErr('');
 }
 
-function setErr(msg){
+function setErr(msg) {
   const el = document.getElementById('errmsg');
   el.textContent = msg;
   el.style.display = msg ? 'block' : 'none';
 }
 
-function syncArtSel(){
+function syncArtSel() {
   const sel = document.getElementById('e-art');
   sel.className = 'sel-art s-' + sel.value;
 }
 
-function addWord(){
-  if(!result) return;
+function addWord() {
+  if (!result) return;
   const art = document.getElementById('e-art').value;
   const de = result.word;
   const en = document.getElementById('e-en').value.trim();
   const cat = document.getElementById('e-cat').value.trim();
-  if(!en){ setErr('Please provide a translation.'); return; }
-  if(!cat){ setErr('Please provide a category.'); return; }
-  if(words.find(w=>w.de.toLowerCase()===de.toLowerCase())){
+  if (!en) { setErr('Please fill in the translation.'); return; }
+  if (!cat) { setErr('Please fill in the category.'); return; }
+  if (words.find(w => w.de.toLowerCase() === de.toLowerCase())) {
     setErr('"' + de + '" is already in your list.'); return;
   }
-  words.push({art, de, en, cat});
+  words.push({ art, de, en, cat });
   saveWords(); render(); discard();
   toast('Added: ' + art + ' ' + de);
 }
 
-function del(i){
+function del(i) {
   const w = words[i];
-  words.splice(i,1); saveWords(); render();
+  words.splice(i, 1); saveWords(); render();
   toast('Removed: ' + w.de);
 }
 
-function toast(msg){
+function toast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
-  setTimeout(()=>t.classList.remove('show'), 2200);
+  setTimeout(() => t.classList.remove('show'), 2200);
 }
 
-function setF(f){
+function setF(f) {
   filt = f;
-  ['all','der','die','das'].forEach(x=>document.getElementById('f-'+x).classList.remove('active'));
+  ['all','der','die','das'].forEach(x => document.getElementById('f-'+x).classList.remove('active'));
   document.getElementById('f-'+f).classList.add('active');
   render();
 }
 
-function render(){
+function render() {
   const q = document.getElementById('search').value.toLowerCase().trim();
-  const view = words.map((w,i)=>({...w,i})).filter(w=>{
-    if(filt!=='all' && w.art!==filt) return false;
-    if(q && !w.de.toLowerCase().includes(q) && !w.en.toLowerCase().includes(q)) return false;
+  const view = words.map((w,i) => ({...w,i})).filter(w => {
+    if (filt !== 'all' && w.art !== filt) return false;
+    if (q && !w.de.toLowerCase().includes(q) && !w.en.toLowerCase().includes(q)) return false;
     return true;
   });
 
@@ -485,29 +607,29 @@ function render(){
   document.getElementById('cnt-das').textContent = words.filter(w=>w.art==='das').length;
 
   const list = document.getElementById('list');
-  if(!view.length){
+  if (!view.length) {
     list.innerHTML = '<div class="empty"><div class="empty-icon">🔍</div><div style="font-size:14px;color:var(--ink3)">No words found</div></div>';
     return;
   }
 
   const cats = {};
-  view.forEach(w=>{ if(!cats[w.cat]) cats[w.cat]=[]; cats[w.cat].push(w); });
+  view.forEach(w => { if (!cats[w.cat]) cats[w.cat]=[]; cats[w.cat].push(w); });
 
   const allCatOrder = getAllCats();
-  const sorted = Object.keys(cats).sort((a,b)=>{
+  const sorted = Object.keys(cats).sort((a,b) => {
     const ai=allCatOrder.indexOf(a), bi=allCatOrder.indexOf(b);
-    if(ai===-1&&bi===-1) return a.localeCompare(b);
-    if(ai===-1) return 1; if(bi===-1) return -1;
+    if (ai===-1&&bi===-1) return a.localeCompare(b);
+    if (ai===-1) return 1; if (bi===-1) return -1;
     return ai-bi;
   });
 
-  list.innerHTML = sorted.map(cat=>`
+  list.innerHTML = sorted.map(cat => `
     <div class="category">
       <div class="cat-header">
         <div class="cat-name">${cat}</div>
         <div class="cat-count">${cats[cat].length} word${cats[cat].length!==1?'s':''}</div>
       </div>
-      <div class="words-grid">${cats[cat].map(w=>`
+      <div class="words-grid">${cats[cat].map(w => `
         <span class="pill p-${w.art}">
           <span class="pbadge b-${w.art}">${w.art}</span>
           <span class="pde">${w.de}</span>
