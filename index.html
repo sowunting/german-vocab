@@ -56,6 +56,7 @@
   .r-note { width: 100%; font-size: 12px; color: var(--ink3); font-style: italic; margin-top: 2px; display: none; }
   .result-edit { padding: 12px 14px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; border-top: 1px solid var(--border); background: var(--card); }
   .result-edit select, .result-edit input { padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--ink); font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; }
+  .result-edit select:focus, .result-edit input:focus { border-color: var(--accent); }
   .sel-art { width: 70px; font-weight: 500; }
   .sel-art.s-der { background: var(--der); color: var(--der-text); border-color: #a8c8e8; }
   .sel-art.s-die { background: var(--die); color: var(--die-text); border-color: #f0c070; }
@@ -65,7 +66,6 @@
   .btn-add { padding: 7px 16px; background: var(--ink); color: #fff; border: none; border-radius: 7px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; }
   .btn-add:hover { background: #333; }
   .btn-discard { padding: 7px 12px; background: none; color: var(--ink3); border: 1px solid var(--border); border-radius: 7px; font-family: 'DM Sans', sans-serif; font-size: 13px; cursor: pointer; }
-  .new-cat-hint { font-size: 11px; color: var(--der-strong); margin-top: 4px; width: 100%; display: none; }
 
   .controls { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
   .search-wrap { flex: 1; min-width: 160px; position: relative; }
@@ -79,9 +79,16 @@
   .fbtn.fs.active { background: var(--das); color: var(--das-text); border-color: var(--das-strong); }
 
   .category { margin-bottom: 28px; }
-  .cat-header { display: flex; justify-content: space-between; margin-bottom: 10px; }
+  .cat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 8px; }
+  .cat-name-wrap { display: flex; align-items: center; gap: 6px; flex: 1; }
   .cat-name { font-size: 12px; font-weight: 500; color: var(--ink2); text-transform: uppercase; letter-spacing: .07em; }
-  .cat-count { font-size: 11px; color: var(--ink3); }
+  .cat-name-input { font-size: 12px; font-weight: 500; color: var(--ink); text-transform: uppercase; letter-spacing: .07em; border: 1px solid var(--accent); border-radius: 4px; padding: 2px 6px; background: var(--card); font-family: 'DM Sans', sans-serif; outline: none; display: none; }
+  .btn-edit-cat { background: none; border: none; cursor: pointer; color: var(--ink3); font-size: 12px; padding: 2px 4px; border-radius: 4px; transition: color .15s; display: none; }
+  .btn-edit-cat:hover { color: var(--accent); }
+  .btn-save-cat { background: var(--accent); color: #fff; border: none; cursor: pointer; font-size: 11px; padding: 2px 8px; border-radius: 4px; font-family: 'DM Sans', sans-serif; display: none; }
+  .cat-name-wrap:hover .btn-edit-cat { display: inline-block; }
+  .cat-count { font-size: 11px; color: var(--ink3); white-space: nowrap; }
+
   .words-grid { display: flex; flex-wrap: wrap; gap: 7px; }
   .pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px 6px 8px; border-radius: 20px; font-size: 13px; border: 1px solid transparent; transition: transform .1s; }
   .pill:hover { transform: translateY(-1px); }
@@ -145,10 +152,10 @@
           <option value="das">das</option>
         </select>
         <input class="inp-en" id="e-en" type="text" placeholder="Translation">
-        <input class="inp-cat" id="e-cat" type="text" placeholder="Category">
+        <input class="inp-cat" id="e-cat" type="text" placeholder="Category" list="cat-suggestions">
+        <datalist id="cat-suggestions"></datalist>
         <button class="btn-add" onclick="addWord()">+ Add to list</button>
         <button class="btn-discard" onclick="discard()">Discard</button>
-        <div class="new-cat-hint" id="new-cat-hint"></div>
       </div>
     </div>
   </div>
@@ -171,121 +178,137 @@
 
 <script>
 const WORKER_URL = "https://german-vocab.sowunting.workers.dev";
-
 const KEY = 'mein-wb-v6';
+
+// Categories without emojis
 const FIXED_CATS = [
-  "👨‍👩‍👧‍👦 Family & people","🏥 Professions","🐾 Animals","🏠 Home & rooms",
-  "🏙️ Places in the city","🍕 Food & drink","⚽ Sports & leisure",
-  "🌦️ Weather & nature","🕐 Time & days","💶 Money & everyday items"
-];
-const DEFAULT = [
-  {art:"die",de:"Mutter",en:"mother",cat:"👨‍👩‍👧‍👦 Family & people"},
-  {art:"der",de:"Vater",en:"father",cat:"👨‍👩‍👧‍👦 Family & people"},
-  {art:"die",de:"Schwester",en:"sister",cat:"👨‍👩‍👧‍👦 Family & people"},
-  {art:"der",de:"Bruder",en:"brother",cat:"👨‍👩‍👧‍👦 Family & people"},
-  {art:"der",de:"Sohn",en:"son",cat:"👨‍👩‍👧‍👦 Family & people"},
-  {art:"die",de:"Tochter",en:"daughter",cat:"👨‍👩‍👧‍👦 Family & people"},
-  {art:"der",de:"Onkel",en:"uncle",cat:"👨‍👩‍👧‍👦 Family & people"},
-  {art:"die",de:"Oma",en:"grandma",cat:"👨‍👩‍👧‍👦 Family & people"},
-  {art:"der",de:"Opa",en:"grandpa",cat:"👨‍👩‍👧‍👦 Family & people"},
-  {art:"der",de:"Junge",en:"boy",cat:"👨‍👩‍👧‍👦 Family & people"},
-  {art:"das",de:"Kind",en:"child",cat:"👨‍👩‍👧‍👦 Family & people"},
-  {art:"die",de:"Frau",en:"woman / Mrs.",cat:"👨‍👩‍👧‍👦 Family & people"},
-  {art:"der",de:"Herr",en:"gentleman / Mr.",cat:"👨‍👩‍👧‍👦 Family & people"},
-  {art:"der",de:"Mann",en:"man",cat:"👨‍👩‍👧‍👦 Family & people"},
-  {art:"der",de:"Mitbewohner",en:"flatmate (m)",cat:"👨‍👩‍👧‍👦 Family & people"},
-  {art:"der",de:"Arzt",en:"doctor (m)",cat:"🏥 Professions"},
-  {art:"die",de:"Ärztin",en:"doctor (f)",cat:"🏥 Professions"},
-  {art:"der",de:"Beruf",en:"profession",cat:"🏥 Professions"},
-  {art:"der",de:"Professor",en:"professor (m)",cat:"🏥 Professions"},
-  {art:"die",de:"Professorin",en:"professor (f)",cat:"🏥 Professions"},
-  {art:"der",de:"Lehrer",en:"teacher (m)",cat:"🏥 Professions"},
-  {art:"die",de:"Lehrerin",en:"teacher (f)",cat:"🏥 Professions"},
-  {art:"der",de:"Schüler",en:"pupil (m)",cat:"🏥 Professions"},
-  {art:"der",de:"Student",en:"student (m)",cat:"🏥 Professions"},
-  {art:"die",de:"Studentin",en:"student (f)",cat:"🏥 Professions"},
-  {art:"der",de:"Schauspieler",en:"actor (m)",cat:"🏥 Professions"},
-  {art:"die",de:"Schauspielerin",en:"actor (f)",cat:"🏥 Professions"},
-  {art:"der",de:"Kanzler",en:"chancellor (m)",cat:"🏥 Professions"},
-  {art:"die",de:"Kanzlerin",en:"chancellor (f)",cat:"🏥 Professions"},
-  {art:"der",de:"Anwalt",en:"lawyer (m)",cat:"🏥 Professions"},
-  {art:"die",de:"Anwältin",en:"lawyer (f)",cat:"🏥 Professions"},
-  {art:"der",de:"Künstler",en:"artist (m)",cat:"🏥 Professions"},
-  {art:"die",de:"Künstlerin",en:"artist (f)",cat:"🏥 Professions"},
-  {art:"der",de:"Kellner",en:"waiter (m)",cat:"🏥 Professions"},
-  {art:"die",de:"Kellnerin",en:"waitress",cat:"🏥 Professions"},
-  {art:"der",de:"Hund",en:"dog",cat:"🐾 Animals"},
-  {art:"die",de:"Eule",en:"owl",cat:"🐾 Animals"},
-  {art:"das",de:"Ei",en:"egg",cat:"🐾 Animals"},
-  {art:"der",de:"Elefant",en:"elephant",cat:"🐾 Animals"},
-  {art:"die",de:"Katze",en:"cat",cat:"🐾 Animals"},
-  {art:"der",de:"Bär",en:"bear",cat:"🐾 Animals"},
-  {art:"der",de:"Fisch",en:"fish",cat:"🐾 Animals"},
-  {art:"das",de:"Badezimmer",en:"bathroom",cat:"🏠 Home & rooms"},
-  {art:"das",de:"Schlafzimmer",en:"bedroom",cat:"🏠 Home & rooms"},
-  {art:"die",de:"Wohnung",en:"apartment",cat:"🏠 Home & rooms"},
-  {art:"der",de:"Tisch",en:"table",cat:"🏠 Home & rooms"},
-  {art:"der",de:"Teppich",en:"carpet / rug",cat:"🏠 Home & rooms"},
-  {art:"der",de:"Schrank",en:"wardrobe / cabinet",cat:"🏠 Home & rooms"},
-  {art:"der",de:"Stuhl",en:"chair",cat:"🏠 Home & rooms"},
-  {art:"die",de:"Lampe",en:"lamp",cat:"🏠 Home & rooms"},
-  {art:"das",de:"Bücherregal",en:"bookshelf",cat:"🏠 Home & rooms"},
-  {art:"das",de:"Schwimmbad",en:"swimming pool",cat:"🏙️ Places in the city"},
-  {art:"das",de:"Kino",en:"cinema",cat:"🏙️ Places in the city"},
-  {art:"die",de:"Schule",en:"school",cat:"🏙️ Places in the city"},
-  {art:"die",de:"Bibliothek",en:"library",cat:"🏙️ Places in the city"},
-  {art:"die",de:"Apotheke",en:"pharmacy",cat:"🏙️ Places in the city"},
-  {art:"der",de:"Bahnhof",en:"train station",cat:"🏙️ Places in the city"},
-  {art:"der",de:"Taxistand",en:"taxi stand",cat:"🏙️ Places in the city"},
-  {art:"der",de:"Marktplatz",en:"market square",cat:"🏙️ Places in the city"},
-  {art:"der",de:"Supermarkt",en:"supermarket",cat:"🏙️ Places in the city"},
-  {art:"der",de:"Markt",en:"market",cat:"🏙️ Places in the city"},
-  {art:"der",de:"Park",en:"park",cat:"🏙️ Places in the city"},
-  {art:"das",de:"Café",en:"café",cat:"🏙️ Places in the city"},
-  {art:"der",de:"Geldautomat",en:"ATM",cat:"🏙️ Places in the city"},
-  {art:"das",de:"Frühstück",en:"breakfast",cat:"🍕 Food & drink"},
-  {art:"der",de:"Kaffee",en:"coffee",cat:"🍕 Food & drink"},
-  {art:"das",de:"Sandwich",en:"sandwich",cat:"🍕 Food & drink"},
-  {art:"das",de:"Wasser",en:"water",cat:"🍕 Food & drink"},
-  {art:"das",de:"Mineralwasser",en:"sparkling water",cat:"🍕 Food & drink"},
-  {art:"die",de:"Wasserflasche",en:"water bottle",cat:"🍕 Food & drink"},
-  {art:"der",de:"Käse",en:"cheese",cat:"🍕 Food & drink"},
-  {art:"die",de:"Pizza",en:"pizza",cat:"🍕 Food & drink"},
-  {art:"der",de:"Wein",en:"wine",cat:"🍕 Food & drink"},
-  {art:"der",de:"Reis",en:"rice",cat:"🍕 Food & drink"},
-  {art:"das",de:"Brot",en:"bread",cat:"🍕 Food & drink"},
-  {art:"der",de:"Hunger",en:"hunger",cat:"🍕 Food & drink"},
-  {art:"der",de:"Fußball",en:"football / soccer",cat:"⚽ Sports & leisure"},
-  {art:"der",de:"Basketball",en:"basketball",cat:"⚽ Sports & leisure"},
-  {art:"der",de:"Volleyball",en:"volleyball",cat:"⚽ Sports & leisure"},
-  {art:"der",de:"Frühling",en:"spring",cat:"🌦️ Weather & nature"},
-  {art:"der",de:"Sommer",en:"summer",cat:"🌦️ Weather & nature"},
-  {art:"der",de:"Herbst",en:"autumn",cat:"🌦️ Weather & nature"},
-  {art:"der",de:"Winter",en:"winter",cat:"🌦️ Weather & nature"},
-  {art:"der",de:"Regen",en:"rain",cat:"🌦️ Weather & nature"},
-  {art:"der",de:"Regenschirm",en:"umbrella",cat:"🌦️ Weather & nature"},
-  {art:"der",de:"Wind",en:"wind",cat:"🌦️ Weather & nature"},
-  {art:"die",de:"Sonne",en:"sun",cat:"🌦️ Weather & nature"},
-  {art:"der",de:"Mond",en:"moon",cat:"🌦️ Weather & nature"},
-  {art:"die",de:"Blume",en:"flower",cat:"🌦️ Weather & nature"},
-  {art:"der",de:"Tag",en:"day",cat:"🕐 Time & days"},
-  {art:"der",de:"Abend",en:"evening",cat:"🕐 Time & days"},
-  {art:"die",de:"Nacht",en:"night",cat:"🕐 Time & days"},
-  {art:"der",de:"Montag",en:"Monday",cat:"🕐 Time & days"},
-  {art:"der",de:"Dienstag",en:"Tuesday",cat:"🕐 Time & days"},
-  {art:"der",de:"Mittwoch",en:"Wednesday",cat:"🕐 Time & days"},
-  {art:"der",de:"Donnerstag",en:"Thursday",cat:"🕐 Time & days"},
-  {art:"der",de:"Freitag",en:"Friday",cat:"🕐 Time & days"},
-  {art:"der",de:"Samstag",en:"Saturday",cat:"🕐 Time & days"},
-  {art:"der",de:"Sonntag",en:"Sunday",cat:"🕐 Time & days"},
-  {art:"die",de:"Rechnung",en:"bill / invoice",cat:"💶 Money & everyday items"},
-  {art:"das",de:"Geld",en:"money",cat:"💶 Money & everyday items"},
-  {art:"die",de:"Bahn",en:"train / railway",cat:"💶 Money & everyday items"},
-  {art:"die",de:"Speisekarte",en:"menu",cat:"💶 Money & everyday items"},
-  {art:"die",de:"Karte",en:"card / map / ticket",cat:"💶 Money & everyday items"},
+  "Family & people", "Professions", "Animals", "Home & rooms",
+  "Places in the city", "Food & drink", "Sports & leisure",
+  "Weather & nature", "Time & days", "Money & everyday items"
 ];
 
-let words = (() => { try { const s=localStorage.getItem(KEY); return s?JSON.parse(s):JSON.parse(JSON.stringify(DEFAULT)); } catch(e){ return JSON.parse(JSON.stringify(DEFAULT)); } })();
+const DEFAULT = [
+  {art:"die",de:"Mutter",en:"mother",cat:"Family & people"},
+  {art:"der",de:"Vater",en:"father",cat:"Family & people"},
+  {art:"die",de:"Schwester",en:"sister",cat:"Family & people"},
+  {art:"der",de:"Bruder",en:"brother",cat:"Family & people"},
+  {art:"der",de:"Sohn",en:"son",cat:"Family & people"},
+  {art:"die",de:"Tochter",en:"daughter",cat:"Family & people"},
+  {art:"der",de:"Onkel",en:"uncle",cat:"Family & people"},
+  {art:"die",de:"Oma",en:"grandma",cat:"Family & people"},
+  {art:"der",de:"Opa",en:"grandpa",cat:"Family & people"},
+  {art:"der",de:"Junge",en:"boy",cat:"Family & people"},
+  {art:"das",de:"Kind",en:"child",cat:"Family & people"},
+  {art:"die",de:"Frau",en:"woman / Mrs.",cat:"Family & people"},
+  {art:"der",de:"Herr",en:"gentleman / Mr.",cat:"Family & people"},
+  {art:"der",de:"Mann",en:"man",cat:"Family & people"},
+  {art:"der",de:"Mitbewohner",en:"flatmate (m)",cat:"Family & people"},
+  {art:"der",de:"Arzt",en:"doctor (m)",cat:"Professions"},
+  {art:"die",de:"Ärztin",en:"doctor (f)",cat:"Professions"},
+  {art:"der",de:"Beruf",en:"profession",cat:"Professions"},
+  {art:"der",de:"Professor",en:"professor (m)",cat:"Professions"},
+  {art:"die",de:"Professorin",en:"professor (f)",cat:"Professions"},
+  {art:"der",de:"Lehrer",en:"teacher (m)",cat:"Professions"},
+  {art:"die",de:"Lehrerin",en:"teacher (f)",cat:"Professions"},
+  {art:"der",de:"Schüler",en:"pupil (m)",cat:"Professions"},
+  {art:"der",de:"Student",en:"student (m)",cat:"Professions"},
+  {art:"die",de:"Studentin",en:"student (f)",cat:"Professions"},
+  {art:"der",de:"Schauspieler",en:"actor (m)",cat:"Professions"},
+  {art:"die",de:"Schauspielerin",en:"actor (f)",cat:"Professions"},
+  {art:"der",de:"Kanzler",en:"chancellor (m)",cat:"Professions"},
+  {art:"die",de:"Kanzlerin",en:"chancellor (f)",cat:"Professions"},
+  {art:"der",de:"Anwalt",en:"lawyer (m)",cat:"Professions"},
+  {art:"die",de:"Anwältin",en:"lawyer (f)",cat:"Professions"},
+  {art:"der",de:"Künstler",en:"artist (m)",cat:"Professions"},
+  {art:"die",de:"Künstlerin",en:"artist (f)",cat:"Professions"},
+  {art:"der",de:"Kellner",en:"waiter (m)",cat:"Professions"},
+  {art:"die",de:"Kellnerin",en:"waitress",cat:"Professions"},
+  {art:"der",de:"Hund",en:"dog",cat:"Animals"},
+  {art:"die",de:"Eule",en:"owl",cat:"Animals"},
+  {art:"das",de:"Ei",en:"egg",cat:"Animals"},
+  {art:"der",de:"Elefant",en:"elephant",cat:"Animals"},
+  {art:"die",de:"Katze",en:"cat",cat:"Animals"},
+  {art:"der",de:"Bär",en:"bear",cat:"Animals"},
+  {art:"der",de:"Fisch",en:"fish",cat:"Animals"},
+  {art:"das",de:"Badezimmer",en:"bathroom",cat:"Home & rooms"},
+  {art:"das",de:"Schlafzimmer",en:"bedroom",cat:"Home & rooms"},
+  {art:"die",de:"Wohnung",en:"apartment",cat:"Home & rooms"},
+  {art:"der",de:"Tisch",en:"table",cat:"Home & rooms"},
+  {art:"der",de:"Teppich",en:"carpet / rug",cat:"Home & rooms"},
+  {art:"der",de:"Schrank",en:"wardrobe / cabinet",cat:"Home & rooms"},
+  {art:"der",de:"Stuhl",en:"chair",cat:"Home & rooms"},
+  {art:"die",de:"Lampe",en:"lamp",cat:"Home & rooms"},
+  {art:"das",de:"Bücherregal",en:"bookshelf",cat:"Home & rooms"},
+  {art:"das",de:"Schwimmbad",en:"swimming pool",cat:"Places in the city"},
+  {art:"das",de:"Kino",en:"cinema",cat:"Places in the city"},
+  {art:"die",de:"Schule",en:"school",cat:"Places in the city"},
+  {art:"die",de:"Bibliothek",en:"library",cat:"Places in the city"},
+  {art:"die",de:"Apotheke",en:"pharmacy",cat:"Places in the city"},
+  {art:"der",de:"Bahnhof",en:"train station",cat:"Places in the city"},
+  {art:"der",de:"Taxistand",en:"taxi stand",cat:"Places in the city"},
+  {art:"der",de:"Marktplatz",en:"market square",cat:"Places in the city"},
+  {art:"der",de:"Supermarkt",en:"supermarket",cat:"Places in the city"},
+  {art:"der",de:"Markt",en:"market",cat:"Places in the city"},
+  {art:"der",de:"Park",en:"park",cat:"Places in the city"},
+  {art:"das",de:"Café",en:"café",cat:"Places in the city"},
+  {art:"der",de:"Geldautomat",en:"ATM",cat:"Places in the city"},
+  {art:"das",de:"Frühstück",en:"breakfast",cat:"Food & drink"},
+  {art:"der",de:"Kaffee",en:"coffee",cat:"Food & drink"},
+  {art:"das",de:"Sandwich",en:"sandwich",cat:"Food & drink"},
+  {art:"das",de:"Wasser",en:"water",cat:"Food & drink"},
+  {art:"das",de:"Mineralwasser",en:"sparkling water",cat:"Food & drink"},
+  {art:"die",de:"Wasserflasche",en:"water bottle",cat:"Food & drink"},
+  {art:"der",de:"Käse",en:"cheese",cat:"Food & drink"},
+  {art:"die",de:"Pizza",en:"pizza",cat:"Food & drink"},
+  {art:"der",de:"Wein",en:"wine",cat:"Food & drink"},
+  {art:"der",de:"Reis",en:"rice",cat:"Food & drink"},
+  {art:"das",de:"Brot",en:"bread",cat:"Food & drink"},
+  {art:"der",de:"Hunger",en:"hunger",cat:"Food & drink"},
+  {art:"der",de:"Fußball",en:"football / soccer",cat:"Sports & leisure"},
+  {art:"der",de:"Basketball",en:"basketball",cat:"Sports & leisure"},
+  {art:"der",de:"Volleyball",en:"volleyball",cat:"Sports & leisure"},
+  {art:"der",de:"Frühling",en:"spring",cat:"Weather & nature"},
+  {art:"der",de:"Sommer",en:"summer",cat:"Weather & nature"},
+  {art:"der",de:"Herbst",en:"autumn",cat:"Weather & nature"},
+  {art:"der",de:"Winter",en:"winter",cat:"Weather & nature"},
+  {art:"der",de:"Regen",en:"rain",cat:"Weather & nature"},
+  {art:"der",de:"Regenschirm",en:"umbrella",cat:"Weather & nature"},
+  {art:"der",de:"Wind",en:"wind",cat:"Weather & nature"},
+  {art:"die",de:"Sonne",en:"sun",cat:"Weather & nature"},
+  {art:"der",de:"Mond",en:"moon",cat:"Weather & nature"},
+  {art:"die",de:"Blume",en:"flower",cat:"Weather & nature"},
+  {art:"der",de:"Tag",en:"day",cat:"Time & days"},
+  {art:"der",de:"Abend",en:"evening",cat:"Time & days"},
+  {art:"die",de:"Nacht",en:"night",cat:"Time & days"},
+  {art:"der",de:"Montag",en:"Monday",cat:"Time & days"},
+  {art:"der",de:"Dienstag",en:"Tuesday",cat:"Time & days"},
+  {art:"der",de:"Mittwoch",en:"Wednesday",cat:"Time & days"},
+  {art:"der",de:"Donnerstag",en:"Thursday",cat:"Time & days"},
+  {art:"der",de:"Freitag",en:"Friday",cat:"Time & days"},
+  {art:"der",de:"Samstag",en:"Saturday",cat:"Time & days"},
+  {art:"der",de:"Sonntag",en:"Sunday",cat:"Time & days"},
+  {art:"die",de:"Rechnung",en:"bill / invoice",cat:"Money & everyday items"},
+  {art:"das",de:"Geld",en:"money",cat:"Money & everyday items"},
+  {art:"die",de:"Bahn",en:"train / railway",cat:"Money & everyday items"},
+  {art:"die",de:"Speisekarte",en:"menu",cat:"Money & everyday items"},
+  {art:"die",de:"Karte",en:"card / map / ticket",cat:"Money & everyday items"},
+];
+
+let words = (() => {
+  try {
+    const s = localStorage.getItem(KEY);
+    if (s) {
+      // Migrate old emoji category names to plain ones
+      const loaded = JSON.parse(s);
+      loaded.forEach(w => {
+        w.cat = w.cat.replace(/^[\p{Emoji}\s]+/u, '').trim();
+      });
+      return loaded;
+    }
+  } catch(e) {}
+  return JSON.parse(JSON.stringify(DEFAULT));
+})();
+
 function saveWords(){ try{localStorage.setItem(KEY,JSON.stringify(words));}catch(e){} }
 
 let filt='all', result=null;
@@ -295,20 +318,25 @@ function getAllCats(){
   return [...FIXED_CATS,...ex.filter(c=>!FIXED_CATS.includes(c))];
 }
 
+function updateCatSuggestions() {
+  const dl = document.getElementById('cat-suggestions');
+  dl.innerHTML = getAllCats().map(c=>`<option value="${c}">`).join('');
+}
+
 function guessCategory(word, translation) {
   const w = word.toLowerCase();
   const t = (translation || '').toLowerCase();
   const checks = [
-    [/\b(mother|father|brother|sister|son|daughter|child|grandm|grandp|uncle|aunt|family|wife|husband|boy|girl|baby|parent)\b/.test(t) || /^(mutter|vater|bruder|schwester|sohn|tochter|kind|oma|opa|onkel|tante|familie|frau|mann|junge|mädchen|baby|eltern)/.test(w), "👨‍👩‍👧‍👦 Family & people"],
-    [/\b(teacher|doctor|lawyer|actor|artist|student|pupil|profession|worker|engineer|pilot|cook|baker|politician|chancellor|waiter|judge|musician|singer|nurse|architect|professor)\b/.test(t) || /(lehrer|arzt|anwalt|schauspieler|künstler|student|schüler|beruf|kellner|richter|ingenieur|pilot|koch|bäcker|sänger|musiker|kanzler|architekt|professor)/.test(w), "🏥 Professions"],
-    [/\b(dog|cat|bird|fish|horse|cow|pig|sheep|rabbit|mouse|bear|wolf|fox|elephant|owl|eagle|dolphin|whale|shark|lion|tiger|animal)\b/.test(t) || /(hund|katze|vogel|fisch|pferd|kuh|schwein|schaf|kaninchen|maus|bär|wolf|fuchs|elefant|eule|adler|delfin|wal|hai|löwe|tiger|tier)/.test(w), "🐾 Animals"],
-    [/\b(room|kitchen|bathroom|bedroom|house|apartment|wall|floor|ceiling|window|door|stairs|garden|balcony|table|chair|sofa|bed|wardrobe|shelf|lamp|carpet|mirror|furniture)\b/.test(t) || /(zimmer|küche|bad|wohnung|haus|wand|boden|decke|fenster|tür|treppe|garten|balkon|tisch|stuhl|sofa|bett|schrank|regal|lampe|teppich|spiegel|möbel)/.test(w), "🏠 Home & rooms"],
-    [/\b(station|airport|school|library|museum|cinema|hospital|pharmacy|supermarket|market|shop|restaurant|café|hotel|park|beach|stadium|church|bank|street|bridge|city)\b/.test(t) || /(bahnhof|flughafen|schule|bibliothek|museum|kino|krankenhaus|apotheke|supermarkt|markt|laden|restaurant|café|hotel|park|strand|stadion|kirche|bank|straße|brücke|platz)/.test(w), "🏙️ Places in the city"],
-    [/\b(food|drink|meal|breakfast|lunch|dinner|bread|cake|cheese|milk|egg|meat|soup|salad|fruit|vegetable|wine|beer|juice|water|coffee|tea|pizza|pasta|rice|hunger|thirst)\b/.test(t) || /(essen|trinken|mahlzeit|frühstück|mittagessen|abendessen|brot|kuchen|käse|milch|ei|fleisch|suppe|salat|obst|gemüse|wein|bier|saft|wasser|kaffee|tee|pizza|nudel|reis|hunger|durst)/.test(w), "🍕 Food & drink"],
-    [/\b(sport|football|basketball|volleyball|tennis|swimming|running|cycling|skiing|gymnastics|yoga|fitness|game|team|goal|ball|training|competition|leisure)\b/.test(t) || /(sport|fußball|basketball|volleyball|tennis|schwimmen|laufen|radfahren|skifahren|turnen|yoga|fitness|spiel|mannschaft|tor|ball|training|wettkampf|freizeit)/.test(w), "⚽ Sports & leisure"],
-    [/\b(weather|rain|snow|sun|wind|cloud|storm|thunder|fog|ice|frost|heat|cold|sky|moon|star|nature|mountain|lake|river|sea|forest|flower|tree|plant|season|spring|summer|autumn|winter)\b/.test(t) || /(wetter|regen|schnee|sonne|wind|wolke|sturm|donner|nebel|eis|frost|hitze|kälte|himmel|mond|stern|natur|berg|see|fluss|meer|wald|blume|baum|pflanze|jahreszeit|frühling|sommer|herbst|winter)/.test(w), "🌦️ Weather & nature"],
-    [/\b(time|hour|minute|second|day|week|month|year|date|morning|noon|evening|night|monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|holiday)\b/.test(t) || /(uhr|stunde|minute|sekunde|tag|woche|monat|jahr|datum|morgen|mittag|abend|nacht|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag|heute|feiertag)/.test(w), "🕐 Time & days"],
-    [/\b(money|euro|cent|coin|price|cost|bill|receipt|cash|credit|card|account|bank|ATM|salary|wage|tax|discount|currency)\b/.test(t) || /(geld|euro|cent|münze|preis|kosten|rechnung|quittung|kasse|kredit|karte|konto|bank|geldautomat|gehalt|lohn|steuer|rabatt|währung)/.test(w), "💶 Money & everyday items"],
+    [/\b(mother|father|brother|sister|son|daughter|child|grandm|grandp|uncle|aunt|family|wife|husband|boy|girl|baby|parent)\b/.test(t) || /^(mutter|vater|bruder|schwester|sohn|tochter|kind|oma|opa|onkel|tante|familie|frau|mann|junge|mädchen|baby|eltern)/.test(w), "Family & people"],
+    [/\b(teacher|doctor|lawyer|actor|artist|student|pupil|profession|worker|engineer|pilot|cook|baker|politician|chancellor|waiter|judge|musician|singer|nurse|architect|professor)\b/.test(t) || /(lehrer|arzt|anwalt|schauspieler|künstler|student|schüler|beruf|kellner|richter|ingenieur|pilot|koch|bäcker|sänger|musiker|kanzler|architekt|professor)/.test(w), "Professions"],
+    [/\b(dog|cat|bird|fish|horse|cow|pig|sheep|rabbit|mouse|bear|wolf|fox|elephant|owl|eagle|dolphin|whale|shark|lion|tiger|animal)\b/.test(t) || /(hund|katze|vogel|fisch|pferd|kuh|schwein|schaf|kaninchen|maus|bär|wolf|fuchs|elefant|eule|adler|delfin|wal|hai|löwe|tiger|tier)/.test(w), "Animals"],
+    [/\b(room|kitchen|bathroom|bedroom|house|apartment|wall|floor|ceiling|window|door|stairs|garden|balcony|table|chair|sofa|bed|wardrobe|shelf|lamp|carpet|mirror|furniture)\b/.test(t) || /(zimmer|küche|bad|wohnung|haus|wand|boden|decke|fenster|tür|treppe|garten|balkon|tisch|stuhl|sofa|bett|schrank|regal|lampe|teppich|spiegel|möbel)/.test(w), "Home & rooms"],
+    [/\b(station|airport|school|library|museum|cinema|hospital|pharmacy|supermarket|market|shop|restaurant|café|hotel|park|beach|stadium|church|bank|street|bridge|city)\b/.test(t) || /(bahnhof|flughafen|schule|bibliothek|museum|kino|krankenhaus|apotheke|supermarkt|markt|laden|restaurant|café|hotel|park|strand|stadion|kirche|bank|straße|brücke|platz)/.test(w), "Places in the city"],
+    [/\b(food|drink|meal|breakfast|lunch|dinner|bread|cake|cheese|milk|egg|meat|soup|salad|fruit|vegetable|wine|beer|juice|water|coffee|tea|pizza|pasta|rice|hunger|thirst)\b/.test(t) || /(essen|trinken|mahlzeit|frühstück|mittagessen|abendessen|brot|kuchen|käse|milch|ei|fleisch|suppe|salat|obst|gemüse|wein|bier|saft|wasser|kaffee|tee|pizza|nudel|reis|hunger|durst)/.test(w), "Food & drink"],
+    [/\b(sport|football|basketball|volleyball|tennis|swimming|running|cycling|skiing|gymnastics|yoga|fitness|game|team|goal|ball|training|competition|leisure)\b/.test(t) || /(sport|fußball|basketball|volleyball|tennis|schwimmen|laufen|radfahren|skifahren|turnen|yoga|fitness|spiel|mannschaft|tor|ball|training|wettkampf|freizeit)/.test(w), "Sports & leisure"],
+    [/\b(weather|rain|snow|sun|wind|cloud|storm|thunder|fog|ice|frost|heat|cold|sky|moon|star|nature|mountain|lake|river|sea|forest|flower|tree|plant|season|spring|summer|autumn|winter)\b/.test(t) || /(wetter|regen|schnee|sonne|wind|wolke|sturm|donner|nebel|eis|frost|hitze|kälte|himmel|mond|stern|natur|berg|see|fluss|meer|wald|blume|baum|pflanze|jahreszeit|frühling|sommer|herbst|winter)/.test(w), "Weather & nature"],
+    [/\b(time|hour|minute|second|day|week|month|year|date|morning|noon|evening|night|monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|holiday)\b/.test(t) || /(uhr|stunde|minute|sekunde|tag|woche|monat|jahr|datum|morgen|mittag|abend|nacht|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag|heute|feiertag)/.test(w), "Time & days"],
+    [/\b(money|euro|cent|coin|price|cost|bill|receipt|cash|credit|card|account|bank|ATM|salary|wage|tax|discount|currency)\b/.test(t) || /(geld|euro|cent|münze|preis|kosten|rechnung|quittung|kasse|kredit|karte|konto|bank|geldautomat|gehalt|lohn|steuer|rabatt|währung)/.test(w), "Money & everyday items"],
   ];
   for (const [test, cat] of checks) { if (test) return cat; }
   return null;
@@ -334,14 +362,13 @@ async function lookup() {
 
     const article = data.article || null;
     const translation = data.translation || null;
-    const cat = guessCategory(word, translation || '') || '📦 Uncategorised';
+    const cat = guessCategory(word, translation || '') || 'Uncategorised';
 
     result = {
       article: article || 'der',
       word,
       translation: translation || '',
       category: cat,
-      isNewCat: !FIXED_CATS.includes(cat) && cat !== '📦 Uncategorised',
       confirmed: !!article,
       noTranslation: !translation
     };
@@ -378,10 +405,7 @@ function showResult(r) {
   document.getElementById('e-art').value = r.article; syncArtSel();
   document.getElementById('e-en').value = r.translation || '';
   document.getElementById('e-cat').value = r.category || '';
-
-  const hint = document.getElementById('new-cat-hint');
-  hint.style.display = r.isNewCat ? 'block' : 'none';
-  if (r.isNewCat) hint.textContent = '✦ New category "' + r.category + '" will be created';
+  updateCatSuggestions();
 
   document.getElementById('result-box').classList.add('on');
   document.getElementById('hint').style.display = 'none';
@@ -421,6 +445,42 @@ function addWord() {
   words.push({ art, de, en, cat });
   saveWords(); render(); discard();
   toast('Added: ' + art + ' ' + de);
+}
+
+// ── Category rename ────────────────────────────────────────────────────────
+function startEditCat(oldCat, labelEl, inputEl, editBtn, saveBtn) {
+  labelEl.style.display = 'none';
+  editBtn.style.display = 'none';
+  inputEl.style.display = 'inline-block';
+  inputEl.value = oldCat;
+  saveBtn.style.display = 'inline-block';
+  inputEl.focus();
+  inputEl.select();
+}
+
+function saveEditCat(oldCat, inputEl, labelEl, editBtn, saveBtn) {
+  const newCat = inputEl.value.trim();
+  if (!newCat || newCat === oldCat) {
+    cancelEditCat(oldCat, labelEl, inputEl, editBtn, saveBtn);
+    return;
+  }
+  // Rename all words in this category
+  words.forEach(w => { if (w.cat === oldCat) w.cat = newCat; });
+  saveWords();
+  inputEl.style.display = 'none';
+  saveBtn.style.display = 'none';
+  labelEl.textContent = newCat.toUpperCase();
+  labelEl.style.display = 'inline';
+  editBtn.style.display = '';
+  toast('Category renamed to "' + newCat + '"');
+  render();
+}
+
+function cancelEditCat(oldCat, labelEl, inputEl, editBtn, saveBtn) {
+  inputEl.style.display = 'none';
+  saveBtn.style.display = 'none';
+  labelEl.style.display = 'inline';
+  editBtn.style.display = '';
 }
 
 function del(i) {
@@ -470,10 +530,24 @@ function render() {
     return ai-bi;
   });
 
-  list.innerHTML = sorted.map(cat => `
+  list.innerHTML = sorted.map(cat => {
+    const safeId = 'cat-' + cat.replace(/[^a-zA-Z0-9]/g, '_');
+    return `
     <div class="category">
       <div class="cat-header">
-        <div class="cat-name">${cat}</div>
+        <div class="cat-name-wrap" id="${safeId}-wrap">
+          <span class="cat-name" id="${safeId}-label">${cat}</span>
+          <input class="cat-name-input" id="${safeId}-input" type="text"
+            onkeydown="if(event.key==='Enter')document.getElementById('${safeId}-save').click(); if(event.key==='Escape')cancelEditCat('${cat}',document.getElementById('${safeId}-label'),this,document.getElementById('${safeId}-edit'),document.getElementById('${safeId}-save'))">
+          <button class="btn-edit-cat" id="${safeId}-edit"
+            onclick="startEditCat('${cat}',document.getElementById('${safeId}-label'),document.getElementById('${safeId}-input'),this,document.getElementById('${safeId}-save'))">
+            Edit
+          </button>
+          <button class="btn-save-cat" id="${safeId}-save"
+            onclick="saveEditCat('${cat}',document.getElementById('${safeId}-input'),document.getElementById('${safeId}-label'),document.getElementById('${safeId}-edit'),this)">
+            Save
+          </button>
+        </div>
         <div class="cat-count">${cats[cat].length} word${cats[cat].length!==1?'s':''}</div>
       </div>
       <div class="words-grid">${cats[cat].map(w => `
@@ -484,7 +558,8 @@ function render() {
           <button class="pdel" onclick="del(${w.i})" title="Remove">×</button>
         </span>`).join('')}
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 render();
