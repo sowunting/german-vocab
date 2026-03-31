@@ -28,7 +28,6 @@
 
   .add-panel { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 24px; box-shadow: var(--shadow); }
   .add-title { font-size: 13px; font-weight: 500; color: var(--ink2); margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.06em; }
-
   .lookup-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; }
   .inp-wrap { position: relative; flex: 1; }
   #inp-de { width: 100%; padding: 10px 38px 10px 14px; border: 1.5px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--ink); font-family: 'DM Sans', sans-serif; font-size: 15px; outline: none; transition: border-color .15s; }
@@ -40,7 +39,6 @@
   .btn-lookup { padding: 10px 18px; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; }
   .btn-lookup:hover { background: #1a4a8a; }
   .btn-lookup:disabled { background: #aaa; cursor: not-allowed; }
-
   .hint { font-size: 12px; color: var(--ink3); margin-bottom: 4px; }
   .err-msg { font-size: 12px; color: #c0392b; margin-top: 6px; display: none; }
 
@@ -58,7 +56,6 @@
   .r-note { width: 100%; font-size: 12px; color: var(--ink3); font-style: italic; margin-top: 2px; display: none; }
   .result-edit { padding: 12px 14px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; border-top: 1px solid var(--border); background: var(--card); }
   .result-edit select, .result-edit input { padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--ink); font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; }
-  .result-edit select:focus, .result-edit input:focus { border-color: var(--accent); }
   .sel-art { width: 70px; font-weight: 500; }
   .sel-art.s-der { background: var(--der); color: var(--der-text); border-color: #a8c8e8; }
   .sel-art.s-die { background: var(--die); color: var(--die-text); border-color: #f0c070; }
@@ -68,14 +65,12 @@
   .btn-add { padding: 7px 16px; background: var(--ink); color: #fff; border: none; border-radius: 7px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; }
   .btn-add:hover { background: #333; }
   .btn-discard { padding: 7px 12px; background: none; color: var(--ink3); border: 1px solid var(--border); border-radius: 7px; font-family: 'DM Sans', sans-serif; font-size: 13px; cursor: pointer; }
-  .btn-discard:hover { color: var(--ink); }
   .new-cat-hint { font-size: 11px; color: var(--der-strong); margin-top: 4px; width: 100%; display: none; }
 
   .controls { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
   .search-wrap { flex: 1; min-width: 160px; position: relative; }
   .search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); opacity: .35; pointer-events: none; }
   .search { width: 100%; padding: 8px 12px 8px 34px; border: 1px solid var(--border); border-radius: 8px; background: var(--card); color: var(--ink); font-family: 'DM Sans', sans-serif; font-size: 14px; outline: none; }
-  .search:focus { border-color: var(--accent); }
   .filter-btns { display: flex; gap: 6px; }
   .fbtn { padding: 7px 14px; border-radius: 20px; border: 1px solid var(--border); background: var(--card); font-size: 13px; cursor: pointer; color: var(--ink2); font-family: 'DM Sans', sans-serif; }
   .fbtn.active { background: var(--ink); color: #fff; border-color: var(--ink); }
@@ -102,9 +97,7 @@
   .pen { color: var(--ink2); font-size: 12px; }
   .pdel { opacity: 0; background: none; border: none; cursor: pointer; color: var(--ink3); font-size: 15px; padding: 0 0 0 2px; transition: opacity .15s, color .15s; }
   .pdel:hover { color: #c0392b; }
-
   .empty { text-align: center; padding: 48px; color: var(--ink3); }
-  .empty-icon { font-size: 40px; margin-bottom: 8px; }
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(60px); background: var(--ink); color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 13px; opacity: 0; transition: all .3s; pointer-events: none; z-index: 999; }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 </style>
@@ -134,9 +127,8 @@
       </div>
       <button class="btn-lookup" id="btn-lk" onclick="lookup()">Look up</button>
     </div>
-    <div class="hint" id="hint">Uses Wiktionary — free, no account needed. Repeated lookups are instant (cached).</div>
+    <div class="hint" id="hint">Free lookup via Wiktionary. Results are cached locally for instant repeat lookups.</div>
     <div class="err-msg" id="errmsg"></div>
-
     <div class="result-box" id="result-box">
       <div class="result-preview">
         <span class="r-badge" id="r-art"></span>
@@ -173,20 +165,18 @@
       <button class="fbtn fs" id="f-das" onclick="setF('das')">das</button>
     </div>
   </div>
-
   <div id="list"></div>
 </div>
 <div class="toast" id="toast"></div>
 
 <script>
 const KEY = 'mein-wb-v6';
-const CACHE_KEY = 'mein-wb-cache-v4';
+const CACHE_KEY = 'mein-wb-cache-v5';
 const FIXED_CATS = [
   "👨‍👩‍👧‍👦 Family & people","🏥 Professions","🐾 Animals","🏠 Home & rooms",
   "🏙️ Places in the city","🍕 Food & drink","⚽ Sports & leisure",
   "🌦️ Weather & nature","🕐 Time & days","💶 Money & everyday items"
 ];
-
 const DEFAULT = [
   {art:"die",de:"Mutter",en:"mother",cat:"👨‍👩‍👧‍👦 Family & people"},
   {art:"der",de:"Vater",en:"father",cat:"👨‍👩‍👧‍👦 Family & people"},
@@ -303,87 +293,93 @@ let filt='all', result=null;
 
 function getAllCats(){
   const existing=[...new Set(words.map(w=>w.cat))];
-  const extra=existing.filter(c=>!FIXED_CATS.includes(c));
-  return [...FIXED_CATS,...extra];
+  return [...FIXED_CATS, ...existing.filter(c=>!FIXED_CATS.includes(c))];
 }
 
-// ── Parse gender from German Wiktionary wikitext ───────────────────────────
-// de.wiktionary uses templates like {{Deutsch Substantiv Übersicht|Genus=f}}
-// or Genus 1=m/f/n, or in headword line: der/die/das
-function parseGenderFromWikitext(wikitext) {
-  // Strategy 1: Genus= field in Substantiv Übersicht template (most reliable)
-  // Matches: |Genus=f or |Genus 1=m etc.
-  const genusMatch = wikitext.match(/[|{]\s*Genus(?:\s*\d+)?\s*=\s*([mfnu])/i);
-  if (genusMatch) {
-    const g = genusMatch[1].toLowerCase();
-    if (g === 'm') return 'der';
-    if (g === 'f') return 'die';
-    if (g === 'n') return 'das';
-  }
+// ── Wiktionary REST API (en.wiktionary.org/api/rest_v1) ───────────────────
+// This endpoint is specifically designed for browser access and supports CORS.
+// Returns JSON with language keys, each containing an array of entries with
+// partOfSpeech and definitions. Gender appears in the partOfSpeech string
+// e.g. "Noun" but more importantly in the definition HTML as gender markers.
+async function lookupWiktionary(word) {
+  // The REST v1 endpoint is the most CORS-friendly
+  const url = `https://en.wiktionary.org/api/rest_v1/page/definition/${encodeURIComponent(word)}`;
+  const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+  if (!res.ok) return null;
+  const data = await res.json();
 
-  // Strategy 2: Look for explicit article in headword/definition lines
-  // e.g. "die Oma" or "der Hund"
-  const artMatch = wikitext.match(/(?:^|\n)[^\n]*\b(der|die|das)\b[^\n]*\n/i);
-  if (artMatch) return artMatch[1].toLowerCase();
+  // German entries live under key "de"
+  const deEntries = data.de;
+  if (!deEntries || !deEntries.length) return null;
 
-  // Strategy 3: gender tags like {{f}}, {{m}}, {{n}}
-  const tagMatch = wikitext.match(/\{\{([mfn])\}\}/);
-  if (tagMatch) {
-    const g = tagMatch[1].toLowerCase();
-    if (g === 'm') return 'der';
-    if (g === 'f') return 'die';
-    if (g === 'n') return 'das';
-  }
+  let article = null;
+  let translation = null;
 
-  return null;
-}
-
-// ── Parse English translation from en.wiktionary wikitext ─────────────────
-function parseTranslationFromWikitext(wikitext) {
-  // Find German section
-  const deSection = wikitext.match(/==\s*German\s*==[\s\S]*?(?===\s*[A-Z][a-z]|$)/);
-  if (!deSection) return null;
-  const text = deSection[0];
-
-  // Find first definition line starting with #
-  const defLines = text.match(/^#\s+(.+)$/mg);
-  if (!defLines) return null;
-
-  for (const line of defLines) {
-    let def = line.replace(/^#\s+/, '');
-    // Strip wiki markup
-    def = def.replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, '$2');
-    def = def.replace(/\[\[([^\]]+)\]\]/g, '$1');
-    def = def.replace(/\{\{[^}]+\}\}/g, '');
-    def = def.replace(/<[^>]+>/g, '');
-    def = def.replace(/[;,].*$/, '');
-    def = def.trim();
-    if (def.length > 1 && def.length < 60 && /[a-zA-Z]/.test(def)) {
-      return def.charAt(0).toUpperCase() + def.slice(1);
+  for (const entry of deEntries) {
+    const pos = (entry.partOfSpeech || '').toLowerCase();
+    // Only process noun entries
+    if (!pos.includes('noun') && !pos.includes('name') && pos !== '') {
+      // still try if pos is empty
     }
+
+    for (const def of (entry.definitions || [])) {
+      const raw = def.definition || '';
+      // Strip all HTML tags to get plain text
+      const plain = raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+
+      // Gender detection — look for explicit gender words in the definition
+      // en.wiktionary typically writes things like:
+      // "feminine noun" / "masculine noun" / "neuter noun"
+      // or has span tags like <span class="gender">f</span>
+      if (!article) {
+        // Check raw HTML for gender spans first (most reliable)
+        if (/class="[^"]*gender[^"]*"[^>]*>\s*f\s*</.test(raw) ||
+            /\bfeminine\b/i.test(plain) ||
+            raw.includes('{{f}}') || raw.includes('|f|') ||
+            /\bdie\b/.test(plain)) {
+          article = 'die';
+        } else if (/class="[^"]*gender[^"]*"[^>]*>\s*m\s*</.test(raw) ||
+            /\bmasculine\b/i.test(plain) ||
+            raw.includes('{{m}}') || raw.includes('|m|') ||
+            /\bder\b/.test(plain)) {
+          article = 'der';
+        } else if (/class="[^"]*gender[^"]*"[^>]*>\s*n\s*</.test(raw) ||
+            /\bneuter\b/i.test(plain) ||
+            raw.includes('{{n}}') || raw.includes('|n|') ||
+            /\bdas\b/.test(plain)) {
+          article = 'das';
+        }
+      }
+
+      // Translation: first clean short definition
+      if (!translation) {
+        const cleaned = plain
+          .replace(/\(.*?\)/g, '')
+          .replace(/\[.*?\]/g, '')
+          .split(/[,;]/)[0]
+          .trim();
+        if (cleaned.length > 1 && cleaned.length < 80 &&
+            /[a-zA-Z]/.test(cleaned) &&
+            !cleaned.toLowerCase().includes('wikipedia') &&
+            !cleaned.toLowerCase().includes('wiktionary')) {
+          translation = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+        }
+      }
+
+      if (article && translation) break;
+    }
+
+    // Also check partOfSpeech field itself for gender
+    if (!article) {
+      if (/feminine/i.test(pos)) article = 'die';
+      else if (/masculine/i.test(pos)) article = 'der';
+      else if (/neuter/i.test(pos)) article = 'das';
+    }
+
+    if (article && translation) break;
   }
-  return null;
-}
 
-// ── Wiktionary API calls ───────────────────────────────────────────────────
-async function getGenderFromDeWiktionary(word) {
-  // Use German Wiktionary which has very structured gender data
-  const url = `https://de.wiktionary.org/w/api.php?action=parse&page=${encodeURIComponent(word)}&prop=wikitext&formatversion=2&format=json&origin=*`;
-  const res = await fetch(url);
-  if (!res.ok) return null;
-  const data = await res.json();
-  if (data.error || !data.parse?.wikitext) return null;
-  return parseGenderFromWikitext(data.parse.wikitext);
-}
-
-async function getTranslationFromEnWiktionary(word) {
-  // Use English Wiktionary for the English translation
-  const url = `https://en.wiktionary.org/w/api.php?action=parse&page=${encodeURIComponent(word)}&prop=wikitext&formatversion=2&format=json&origin=*`;
-  const res = await fetch(url);
-  if (!res.ok) return null;
-  const data = await res.json();
-  if (data.error || !data.parse?.wikitext) return null;
-  return parseTranslationFromWikitext(data.parse.wikitext);
+  return { article, translation };
 }
 
 // ── Category rules ─────────────────────────────────────────────────────────
@@ -391,20 +387,18 @@ function guessCategory(word, translation) {
   const w = word.toLowerCase();
   const t = (translation || '').toLowerCase();
   const checks = [
-    [/\b(mother|father|brother|sister|son|daughter|child|grandm|grandp|uncle|aunt|family|wife|husband|boy|girl|baby|parent)\b/.test(t) || /^(mutter|vater|bruder|schwester|sohn|tochter|kind|oma|opa|onkel|tante|familie|frau|mann|junge|mädchen|baby|eltern)/.test(w), "👨‍👩‍👧‍👦 Family & people"],
-    [/\b(teacher|doctor|lawyer|actor|artist|student|pupil|job|profession|worker|engineer|pilot|cook|baker|politician|chancellor|waiter|judge|musician|singer|nurse|architect)\b/.test(t) || /(lehrer|arzt|anwalt|schauspieler|künstler|student|schüler|beruf|kellner|richter|ingenieur|pilot|koch|bäcker|sänger|musiker|kanzler|pfleger|architekt)/.test(w), "🏥 Professions"],
-    [/\b(dog|cat|bird|fish|horse|cow|pig|sheep|rabbit|mouse|bear|wolf|fox|elephant|owl|eagle|dolphin|whale|shark|lion|tiger|animal)\b/.test(t) || /(hund|katze|vogel|fisch|pferd|kuh|schwein|schaf|kaninchen|maus|bär|wolf|fuchs|elefant|eule|adler|delfin|wal|hai|löwe|tiger|tier)/.test(w), "🐾 Animals"],
-    [/\b(room|kitchen|bathroom|bedroom|house|apartment|wall|floor|ceiling|window|door|stairs|garden|balcony|table|chair|sofa|bed|wardrobe|shelf|lamp|carpet|mirror|furniture)\b/.test(t) || /(zimmer|küche|bad|wohnung|haus|wand|boden|decke|fenster|tür|treppe|garten|balkon|tisch|stuhl|sofa|bett|schrank|regal|lampe|teppich|spiegel|möbel)/.test(w), "🏠 Home & rooms"],
-    [/\b(station|airport|school|library|museum|cinema|hospital|pharmacy|supermarket|market|shop|store|restaurant|café|hotel|park|beach|stadium|church|police|bank|street|bridge|subway|city)\b/.test(t) || /(bahnhof|flughafen|schule|bibliothek|museum|kino|krankenhaus|apotheke|supermarkt|markt|laden|restaurant|café|hotel|park|strand|stadion|kirche|polizei|bank|straße|brücke|platz)/.test(w), "🏙️ Places in the city"],
-    [/\b(food|drink|meal|breakfast|lunch|dinner|bread|cake|cheese|milk|egg|meat|soup|salad|fruit|vegetable|wine|beer|juice|water|coffee|tea|pizza|pasta|rice|hungry|thirsty|snack)\b/.test(t) || /(essen|trinken|mahlzeit|frühstück|mittagessen|abendessen|brot|kuchen|käse|milch|ei|fleisch|suppe|salat|obst|gemüse|wein|bier|saft|wasser|kaffee|tee|pizza|nudel|reis|hunger|durst)/.test(w), "🍕 Food & drink"],
-    [/\b(sport|football|basketball|volleyball|tennis|swimming|running|cycling|skiing|gymnastics|yoga|fitness|game|team|goal|ball|stadium|training|competition)\b/.test(t) || /(sport|fußball|basketball|volleyball|tennis|schwimmen|laufen|radfahren|skifahren|turnen|yoga|fitness|spiel|mannschaft|tor|ball|stadion|training|wettkampf)/.test(w), "⚽ Sports & leisure"],
-    [/\b(weather|rain|snow|sun|wind|cloud|storm|thunder|lightning|fog|ice|frost|heat|cold|sky|moon|star|nature|mountain|lake|river|sea|forest|flower|tree|plant|season|spring|summer|autumn|winter)\b/.test(t) || /(wetter|regen|schnee|sonne|wind|wolke|sturm|donner|blitz|nebel|eis|frost|hitze|kälte|himmel|mond|stern|natur|berg|see|fluss|meer|wald|blume|baum|pflanze|jahreszeit|frühling|sommer|herbst|winter)/.test(w), "🌦️ Weather & nature"],
-    [/\b(time|hour|minute|second|day|week|month|year|date|calendar|morning|noon|evening|night|monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|yesterday|tomorrow|holiday)\b/.test(t) || /(uhr|stunde|minute|sekunde|tag|woche|monat|jahr|datum|kalender|morgen|mittag|abend|nacht|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag|heute|gestern|feiertag)/.test(w), "🕐 Time & days"],
-    [/\b(money|euro|cent|coin|price|cost|bill|receipt|cash|credit|card|account|bank|ATM|buy|sell|pay|salary|wage|tax|discount|currency)\b/.test(t) || /(geld|euro|cent|münze|preis|kosten|rechnung|quittung|kasse|kredit|karte|konto|bank|geldautomat|kaufen|verkaufen|bezahlen|gehalt|lohn|steuer|rabatt|währung)/.test(w), "💶 Money & everyday items"],
+    [/\b(mother|father|brother|sister|son|daughter|child|grandm|grandp|uncle|aunt|family|wife|husband|boy|girl|baby|parent|relative)\b/.test(t) || /^(mutter|vater|bruder|schwester|sohn|tochter|kind|oma|opa|onkel|tante|familie|frau|mann|junge|mädchen|baby|eltern|geschwister)/.test(w), "👨‍👩‍👧‍👦 Family & people"],
+    [/\b(teacher|doctor|lawyer|actor|artist|student|pupil|profession|worker|engineer|pilot|cook|baker|politician|chancellor|waiter|judge|musician|singer|nurse|architect|professor)\b/.test(t) || /(lehrer|arzt|anwalt|schauspieler|künstler|student|schüler|beruf|kellner|richter|ingenieur|pilot|koch|bäcker|sänger|musiker|kanzler|pfleger|architekt|professor)/.test(w), "🏥 Professions"],
+    [/\b(dog|cat|bird|fish|horse|cow|pig|sheep|rabbit|mouse|bear|wolf|fox|elephant|owl|eagle|dolphin|whale|shark|lion|tiger|animal|insect|snake|frog)\b/.test(t) || /(hund|katze|vogel|fisch|pferd|kuh|schwein|schaf|kaninchen|maus|bär|wolf|fuchs|elefant|eule|adler|delfin|wal|hai|löwe|tiger|tier|insekt|schlange|frosch)/.test(w), "🐾 Animals"],
+    [/\b(room|kitchen|bathroom|bedroom|house|apartment|wall|floor|ceiling|window|door|stairs|garden|balcony|table|chair|sofa|bed|wardrobe|shelf|lamp|carpet|mirror|furniture|toilet)\b/.test(t) || /(zimmer|küche|bad|wohnung|haus|wand|boden|decke|fenster|tür|treppe|garten|balkon|tisch|stuhl|sofa|bett|schrank|regal|lampe|teppich|spiegel|möbel|toilette)/.test(w), "🏠 Home & rooms"],
+    [/\b(station|airport|school|library|museum|cinema|hospital|pharmacy|supermarket|market|shop|restaurant|café|hotel|park|beach|stadium|church|bank|street|bridge|subway|city|store)\b/.test(t) || /(bahnhof|flughafen|schule|bibliothek|museum|kino|krankenhaus|apotheke|supermarkt|markt|laden|restaurant|café|hotel|park|strand|stadion|kirche|bank|straße|brücke|platz|u-bahn)/.test(w), "🏙️ Places in the city"],
+    [/\b(food|drink|meal|breakfast|lunch|dinner|bread|cake|cheese|milk|egg|meat|soup|salad|fruit|vegetable|wine|beer|juice|water|coffee|tea|pizza|pasta|rice|hunger|thirst|snack|butter)\b/.test(t) || /(essen|trinken|mahlzeit|frühstück|mittagessen|abendessen|brot|kuchen|käse|milch|ei|fleisch|suppe|salat|obst|gemüse|wein|bier|saft|wasser|kaffee|tee|pizza|nudel|reis|hunger|durst|butter)/.test(w), "🍕 Food & drink"],
+    [/\b(sport|football|basketball|volleyball|tennis|swimming|running|cycling|skiing|gymnastics|yoga|fitness|game|team|goal|ball|stadium|training|competition|hobby|leisure)\b/.test(t) || /(sport|fußball|basketball|volleyball|tennis|schwimmen|laufen|radfahren|skifahren|turnen|yoga|fitness|spiel|mannschaft|tor|ball|stadion|training|wettkampf|freizeit)/.test(w), "⚽ Sports & leisure"],
+    [/\b(weather|rain|snow|sun|wind|cloud|storm|thunder|fog|ice|frost|heat|cold|sky|moon|star|nature|mountain|lake|river|sea|forest|flower|tree|plant|season|spring|summer|autumn|winter)\b/.test(t) || /(wetter|regen|schnee|sonne|wind|wolke|sturm|donner|nebel|eis|frost|hitze|kälte|himmel|mond|stern|natur|berg|see|fluss|meer|wald|blume|baum|pflanze|jahreszeit|frühling|sommer|herbst|winter)/.test(w), "🌦️ Weather & nature"],
+    [/\b(time|hour|minute|second|day|week|month|year|date|morning|noon|evening|night|monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|yesterday|tomorrow|holiday|calendar)\b/.test(t) || /(uhr|stunde|minute|sekunde|tag|woche|monat|jahr|datum|morgen|mittag|abend|nacht|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag|heute|gestern|feiertag|kalender)/.test(w), "🕐 Time & days"],
+    [/\b(money|euro|cent|coin|price|cost|bill|receipt|cash|credit|card|account|bank|ATM|salary|wage|tax|discount|currency|payment)\b/.test(t) || /(geld|euro|cent|münze|preis|kosten|rechnung|quittung|kasse|kredit|karte|konto|bank|geldautomat|gehalt|lohn|steuer|rabatt|währung|bezahlung)/.test(w), "💶 Money & everyday items"],
   ];
-  for (const [test, cat] of checks) {
-    if (test) return cat;
-  }
+  for (const [test, cat] of checks) { if (test) return cat; }
   return null;
 }
 
@@ -421,29 +415,26 @@ async function lookup() {
 
   setLoading(true); hideResult(); setErr('');
 
-  // Always capitalise for German nouns
   const word = raw.charAt(0).toUpperCase() + raw.slice(1);
 
   try {
-    // Run both API calls in parallel for speed
-    const [article, translation] = await Promise.all([
-      getGenderFromDeWiktionary(word).catch(() => null),
-      getTranslationFromEnWiktionary(word).catch(() => null)
-    ]);
+    // Try capitalised first (standard German noun form), then lowercase
+    let wikResult = await lookupWiktionary(word);
+    if (!wikResult || (!wikResult.article && !wikResult.translation)) {
+      wikResult = await lookupWiktionary(raw.toLowerCase());
+    }
 
+    const article = wikResult?.article || null;
+    const translation = wikResult?.translation || null;
     const cat = guessCategory(word, translation || '') || '📦 Uncategorised';
-    const isNewCat = !FIXED_CATS.includes(cat) && cat !== '📦 Uncategorised';
-    const confirmed = !!article;
 
     const resultObj = {
       article: article || 'der',
       word,
       translation: translation || '',
       category: cat,
-      isNewCat,
-      corrected: false,
-      original: '',
-      confirmed,
+      isNewCat: !FIXED_CATS.includes(cat) && cat !== '📦 Uncategorised',
+      confirmed: !!article,
       noTranslation: !translation
     };
 
@@ -462,8 +453,7 @@ function setLoading(on) {
   document.getElementById('spin').classList.toggle('on', on);
   document.getElementById('inp-de').classList.toggle('loading', on);
   const btn = document.getElementById('btn-lk');
-  btn.disabled = on;
-  btn.textContent = on ? '…' : 'Look up';
+  btn.disabled = on; btn.textContent = on ? '…' : 'Look up';
 }
 
 function showResult(r) {
@@ -474,11 +464,11 @@ function showResult(r) {
   document.getElementById('r-en').textContent = r.translation || '—';
   document.getElementById('r-cat').textContent = r.category || '';
 
-  const noteEl = document.getElementById('r-note');
   const parts = [];
   if (r.fromCache) parts.push('⚡ from cache');
-  if (!r.confirmed && !r.fromCache) parts.push('⚠️ Gender not found in Wiktionary — please verify');
+  if (!r.confirmed && !r.fromCache) parts.push('⚠️ Gender not confirmed — please verify before adding');
   if (r.noTranslation && !r.fromCache) parts.push('Translation not found — please fill in');
+  const noteEl = document.getElementById('r-note');
   noteEl.textContent = parts.join(' · ');
   noteEl.style.display = parts.length ? 'block' : 'none';
 
@@ -487,12 +477,8 @@ function showResult(r) {
   document.getElementById('e-cat').value = r.category || '';
 
   const hint = document.getElementById('new-cat-hint');
-  if (r.isNewCat) {
-    hint.textContent = '✦ New category "' + r.category + '" will be created';
-    hint.style.display = 'block';
-  } else {
-    hint.style.display = 'none';
-  }
+  hint.style.display = r.isNewCat ? 'block' : 'none';
+  if (r.isNewCat) hint.textContent = '✦ New category "' + r.category + '" will be created';
 
   document.getElementById('result-box').classList.add('on');
   document.getElementById('hint').style.display = 'none';
@@ -511,13 +497,11 @@ function discard() {
 
 function setErr(msg) {
   const el = document.getElementById('errmsg');
-  el.textContent = msg;
-  el.style.display = msg ? 'block' : 'none';
+  el.textContent = msg; el.style.display = msg ? 'block' : 'none';
 }
 
 function syncArtSel() {
-  const sel = document.getElementById('e-art');
-  sel.className = 'sel-art s-' + sel.value;
+  document.getElementById('e-art').className = 'sel-art s-' + document.getElementById('e-art').value;
 }
 
 function addWord() {
@@ -537,8 +521,7 @@ function addWord() {
 }
 
 function del(i) {
-  const w = words[i];
-  words.splice(i, 1); saveWords(); render();
+  const w = words[i]; words.splice(i,1); saveWords(); render();
   toast('Removed: ' + w.de);
 }
 
@@ -570,16 +553,16 @@ function render() {
 
   const list = document.getElementById('list');
   if (!view.length) {
-    list.innerHTML = '<div class="empty"><div class="empty-icon">🔍</div><div style="font-size:14px;color:var(--ink3)">No words found</div></div>';
+    list.innerHTML = '<div class="empty"><div style="font-size:40px">🔍</div><div style="font-size:14px;color:var(--ink3);margin-top:8px">No words found</div></div>';
     return;
   }
 
   const cats = {};
   view.forEach(w => { if (!cats[w.cat]) cats[w.cat]=[]; cats[w.cat].push(w); });
 
-  const allCatOrder = getAllCats();
+  const order = getAllCats();
   const sorted = Object.keys(cats).sort((a,b) => {
-    const ai=allCatOrder.indexOf(a), bi=allCatOrder.indexOf(b);
+    const ai=order.indexOf(a), bi=order.indexOf(b);
     if (ai===-1&&bi===-1) return a.localeCompare(b);
     if (ai===-1) return 1; if (bi===-1) return -1;
     return ai-bi;
