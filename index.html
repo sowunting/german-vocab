@@ -22,9 +22,16 @@
   .logo { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 600; letter-spacing: -0.5px; }
   .logo span { color: var(--der-strong); }
   .subtitle { font-size: 13px; color: var(--ink3); margin-top: 2px; font-weight: 300; }
+  .header-right { display: flex; align-items: flex-end; gap: 20px; flex-wrap: wrap; }
   .stats { display: flex; gap: 16px; font-size: 13px; color: var(--ink2); }
   .stat { display: flex; flex-direction: column; align-items: center; }
   .stat-num { font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 600; color: var(--ink); line-height: 1; }
+  .sync-status { font-size: 11px; color: var(--ink3); display: flex; align-items: center; gap: 5px; }
+  .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink3); flex-shrink: 0; }
+  .sync-dot.synced { background: var(--das-strong); }
+  .sync-dot.syncing { background: var(--die-strong); animation: pulse .8s ease-in-out infinite; }
+  .sync-dot.error { background: #c0392b; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 
   .add-panel { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 24px; box-shadow: var(--shadow); }
   .add-title { font-size: 13px; font-weight: 500; color: var(--ink2); margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.06em; }
@@ -56,7 +63,6 @@
   .r-note { width: 100%; font-size: 12px; color: var(--ink3); font-style: italic; margin-top: 2px; display: none; }
   .result-edit { padding: 12px 14px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; border-top: 1px solid var(--border); background: var(--card); }
   .result-edit select, .result-edit input { padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--ink); font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; }
-  .result-edit select:focus, .result-edit input:focus { border-color: var(--accent); }
   .sel-art { width: 70px; font-weight: 500; }
   .sel-art.s-der { background: var(--der); color: var(--der-text); border-color: #a8c8e8; }
   .sel-art.s-die { background: var(--die); color: var(--die-text); border-color: #f0c070; }
@@ -83,7 +89,7 @@
   .cat-name-wrap { display: flex; align-items: center; gap: 6px; flex: 1; }
   .cat-name { font-size: 12px; font-weight: 500; color: var(--ink2); text-transform: uppercase; letter-spacing: .07em; }
   .cat-name-input { font-size: 12px; font-weight: 500; color: var(--ink); text-transform: uppercase; letter-spacing: .07em; border: 1px solid var(--accent); border-radius: 4px; padding: 2px 6px; background: var(--card); font-family: 'DM Sans', sans-serif; outline: none; display: none; }
-  .btn-edit-cat { background: none; border: none; cursor: pointer; color: var(--ink3); font-size: 12px; padding: 2px 4px; border-radius: 4px; transition: color .15s; display: none; }
+  .btn-edit-cat { background: none; border: none; cursor: pointer; color: var(--ink3); font-size: 12px; padding: 2px 4px; border-radius: 4px; display: none; }
   .btn-edit-cat:hover { color: var(--accent); }
   .btn-save-cat { background: var(--accent); color: #fff; border: none; cursor: pointer; font-size: 11px; padding: 2px 8px; border-radius: 4px; font-family: 'DM Sans', sans-serif; display: none; }
   .cat-name-wrap:hover .btn-edit-cat { display: inline-block; }
@@ -116,11 +122,17 @@
       <div class="logo">Mein <span>Wörterbuch</span></div>
       <div class="subtitle">My German vocabulary list</div>
     </div>
-    <div class="stats">
-      <div class="stat"><span class="stat-num" id="cnt-all">0</span><span>total</span></div>
-      <div class="stat"><span class="stat-num" id="cnt-der" style="color:var(--der-strong)">0</span><span style="color:var(--der-strong)">der</span></div>
-      <div class="stat"><span class="stat-num" id="cnt-die" style="color:var(--die-strong)">0</span><span style="color:var(--die-strong)">die</span></div>
-      <div class="stat"><span class="stat-num" id="cnt-das" style="color:var(--das-strong)">0</span><span style="color:var(--das-strong)">das</span></div>
+    <div class="header-right">
+      <div class="sync-status">
+        <div class="sync-dot" id="sync-dot"></div>
+        <span id="sync-label">Loading…</span>
+      </div>
+      <div class="stats">
+        <div class="stat"><span class="stat-num" id="cnt-all">0</span><span>total</span></div>
+        <div class="stat"><span class="stat-num" id="cnt-der" style="color:var(--der-strong)">0</span><span style="color:var(--der-strong)">der</span></div>
+        <div class="stat"><span class="stat-num" id="cnt-die" style="color:var(--die-strong)">0</span><span style="color:var(--die-strong)">die</span></div>
+        <div class="stat"><span class="stat-num" id="cnt-das" style="color:var(--das-strong)">0</span><span style="color:var(--das-strong)">das</span></div>
+      </div>
     </div>
   </header>
 
@@ -134,7 +146,7 @@
       </div>
       <button class="btn-lookup" id="btn-lk" onclick="lookup()">Look up</button>
     </div>
-    <div class="hint" id="hint">Gender and translation from verbformen.com via your Cloudflare Worker.</div>
+    <div class="hint" id="hint">Gender and translation from verbformen.com. Synced across all your devices.</div>
     <div class="err-msg" id="errmsg"></div>
     <div class="result-box" id="result-box">
       <div class="result-preview">
@@ -178,15 +190,11 @@
 
 <script>
 const WORKER_URL = "https://german-vocab.sowunting.workers.dev";
-const KEY = 'mein-wb-v6';
-
-// Categories without emojis
 const FIXED_CATS = [
-  "Family & people", "Professions", "Animals", "Home & rooms",
-  "Places in the city", "Food & drink", "Sports & leisure",
-  "Weather & nature", "Time & days", "Money & everyday items"
+  "Family & people","Professions","Animals","Home & rooms",
+  "Places in the city","Food & drink","Sports & leisure",
+  "Weather & nature","Time & days","Money & everyday items"
 ];
-
 const DEFAULT = [
   {art:"die",de:"Mutter",en:"mother",cat:"Family & people"},
   {art:"der",de:"Vater",en:"father",cat:"Family & people"},
@@ -294,90 +302,123 @@ const DEFAULT = [
   {art:"die",de:"Karte",en:"card / map / ticket",cat:"Money & everyday items"},
 ];
 
-let words = (() => {
+let words = [];
+let filt = 'all';
+let result = null;
+let saveTimer = null;
+
+// ── Sync status UI ─────────────────────────────────────────────────────────
+function setSyncStatus(state, label) {
+  const dot = document.getElementById('sync-dot');
+  const lbl = document.getElementById('sync-label');
+  dot.className = 'sync-dot ' + state;
+  lbl.textContent = label;
+}
+
+// ── Load from cloud on startup ─────────────────────────────────────────────
+async function loadFromCloud() {
+  setSyncStatus('syncing', 'Syncing…');
   try {
-    const s = localStorage.getItem(KEY);
-    if (s) {
-      // Migrate old emoji category names to plain ones
-      const loaded = JSON.parse(s);
-      loaded.forEach(w => {
-        w.cat = w.cat.replace(/^[\p{Emoji}\s]+/u, '').trim();
-      });
-      return loaded;
+    const res = await fetch(`${WORKER_URL}?action=getWords`);
+    if (!res.ok) throw new Error('Load failed');
+    const data = await res.json();
+    if (Array.isArray(data) && data.length > 0) {
+      words = data;
+    } else {
+      words = JSON.parse(JSON.stringify(DEFAULT));
+      await saveToCloud();
     }
-  } catch(e) {}
-  return JSON.parse(JSON.stringify(DEFAULT));
-})();
+    setSyncStatus('synced', 'Synced');
+  } catch(e) {
+    setSyncStatus('error', 'Offline — changes saved locally');
+    // Fall back to localStorage
+    try {
+      const local = localStorage.getItem('mein-wb-v6');
+      words = local ? JSON.parse(local) : JSON.parse(JSON.stringify(DEFAULT));
+    } catch(e2) {
+      words = JSON.parse(JSON.stringify(DEFAULT));
+    }
+  }
+  render();
+}
 
-function saveWords(){ try{localStorage.setItem(KEY,JSON.stringify(words));}catch(e){} }
+// ── Save to cloud (debounced) ───────────────────────────────────────────────
+async function saveToCloud() {
+  // Also save locally as backup
+  try { localStorage.setItem('mein-wb-v6', JSON.stringify(words)); } catch(e) {}
 
-let filt='all', result=null;
+  setSyncStatus('syncing', 'Saving…');
+  try {
+    const res = await fetch(`${WORKER_URL}?action=saveWords`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(words)
+    });
+    if (!res.ok) throw new Error('Save failed');
+    setSyncStatus('synced', 'Synced');
+  } catch(e) {
+    setSyncStatus('error', 'Save failed — will retry');
+  }
+}
 
-function getAllCats(){
-  const ex=[...new Set(words.map(w=>w.cat))];
-  return [...FIXED_CATS,...ex.filter(c=>!FIXED_CATS.includes(c))];
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveToCloud, 800);
+}
+
+// ── Category helpers ────────────────────────────────────────────────────────
+function getAllCats() {
+  const ex = [...new Set(words.map(w => w.cat))];
+  return [...FIXED_CATS, ...ex.filter(c => !FIXED_CATS.includes(c))];
 }
 
 function updateCatSuggestions() {
   const dl = document.getElementById('cat-suggestions');
-  dl.innerHTML = getAllCats().map(c=>`<option value="${c}">`).join('');
+  dl.innerHTML = getAllCats().map(c => `<option value="${c}">`).join('');
 }
 
+// ── Category guess ──────────────────────────────────────────────────────────
 function guessCategory(word, translation) {
-  const w = word.toLowerCase();
-  const t = (translation || '').toLowerCase();
+  const w = word.toLowerCase(), t = (translation || '').toLowerCase();
   const checks = [
     [/\b(mother|father|brother|sister|son|daughter|child|grandm|grandp|uncle|aunt|family|wife|husband|boy|girl|baby|parent)\b/.test(t) || /^(mutter|vater|bruder|schwester|sohn|tochter|kind|oma|opa|onkel|tante|familie|frau|mann|junge|mädchen|baby|eltern)/.test(w), "Family & people"],
-    [/\b(teacher|doctor|lawyer|actor|artist|student|pupil|profession|worker|engineer|pilot|cook|baker|politician|chancellor|waiter|judge|musician|singer|nurse|architect|professor)\b/.test(t) || /(lehrer|arzt|anwalt|schauspieler|künstler|student|schüler|beruf|kellner|richter|ingenieur|pilot|koch|bäcker|sänger|musiker|kanzler|architekt|professor)/.test(w), "Professions"],
-    [/\b(dog|cat|bird|fish|horse|cow|pig|sheep|rabbit|mouse|bear|wolf|fox|elephant|owl|eagle|dolphin|whale|shark|lion|tiger|animal)\b/.test(t) || /(hund|katze|vogel|fisch|pferd|kuh|schwein|schaf|kaninchen|maus|bär|wolf|fuchs|elefant|eule|adler|delfin|wal|hai|löwe|tiger|tier)/.test(w), "Animals"],
-    [/\b(room|kitchen|bathroom|bedroom|house|apartment|wall|floor|ceiling|window|door|stairs|garden|balcony|table|chair|sofa|bed|wardrobe|shelf|lamp|carpet|mirror|furniture)\b/.test(t) || /(zimmer|küche|bad|wohnung|haus|wand|boden|decke|fenster|tür|treppe|garten|balkon|tisch|stuhl|sofa|bett|schrank|regal|lampe|teppich|spiegel|möbel)/.test(w), "Home & rooms"],
-    [/\b(station|airport|school|library|museum|cinema|hospital|pharmacy|supermarket|market|shop|restaurant|café|hotel|park|beach|stadium|church|bank|street|bridge|city)\b/.test(t) || /(bahnhof|flughafen|schule|bibliothek|museum|kino|krankenhaus|apotheke|supermarkt|markt|laden|restaurant|café|hotel|park|strand|stadion|kirche|bank|straße|brücke|platz)/.test(w), "Places in the city"],
-    [/\b(food|drink|meal|breakfast|lunch|dinner|bread|cake|cheese|milk|egg|meat|soup|salad|fruit|vegetable|wine|beer|juice|water|coffee|tea|pizza|pasta|rice|hunger|thirst)\b/.test(t) || /(essen|trinken|mahlzeit|frühstück|mittagessen|abendessen|brot|kuchen|käse|milch|ei|fleisch|suppe|salat|obst|gemüse|wein|bier|saft|wasser|kaffee|tee|pizza|nudel|reis|hunger|durst)/.test(w), "Food & drink"],
-    [/\b(sport|football|basketball|volleyball|tennis|swimming|running|cycling|skiing|gymnastics|yoga|fitness|game|team|goal|ball|training|competition|leisure)\b/.test(t) || /(sport|fußball|basketball|volleyball|tennis|schwimmen|laufen|radfahren|skifahren|turnen|yoga|fitness|spiel|mannschaft|tor|ball|training|wettkampf|freizeit)/.test(w), "Sports & leisure"],
-    [/\b(weather|rain|snow|sun|wind|cloud|storm|thunder|fog|ice|frost|heat|cold|sky|moon|star|nature|mountain|lake|river|sea|forest|flower|tree|plant|season|spring|summer|autumn|winter)\b/.test(t) || /(wetter|regen|schnee|sonne|wind|wolke|sturm|donner|nebel|eis|frost|hitze|kälte|himmel|mond|stern|natur|berg|see|fluss|meer|wald|blume|baum|pflanze|jahreszeit|frühling|sommer|herbst|winter)/.test(w), "Weather & nature"],
-    [/\b(time|hour|minute|second|day|week|month|year|date|morning|noon|evening|night|monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|holiday)\b/.test(t) || /(uhr|stunde|minute|sekunde|tag|woche|monat|jahr|datum|morgen|mittag|abend|nacht|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag|heute|feiertag)/.test(w), "Time & days"],
-    [/\b(money|euro|cent|coin|price|cost|bill|receipt|cash|credit|card|account|bank|ATM|salary|wage|tax|discount|currency)\b/.test(t) || /(geld|euro|cent|münze|preis|kosten|rechnung|quittung|kasse|kredit|karte|konto|bank|geldautomat|gehalt|lohn|steuer|rabatt|währung)/.test(w), "Money & everyday items"],
+    [/\b(teacher|doctor|lawyer|actor|artist|student|pupil|profession|worker|engineer|pilot|cook|baker|politician|chancellor|waiter|judge|musician|singer|nurse|professor)\b/.test(t) || /(lehrer|arzt|anwalt|schauspieler|künstler|student|schüler|beruf|kellner|richter|ingenieur|pilot|koch|bäcker|sänger|musiker|kanzler|professor)/.test(w), "Professions"],
+    [/\b(dog|cat|bird|fish|horse|cow|pig|sheep|rabbit|mouse|bear|wolf|fox|elephant|owl|eagle|lion|tiger|animal)\b/.test(t) || /(hund|katze|vogel|fisch|pferd|kuh|schwein|schaf|kaninchen|maus|bär|wolf|fuchs|elefant|eule|löwe|tiger|tier)/.test(w), "Animals"],
+    [/\b(room|kitchen|bathroom|bedroom|house|apartment|table|chair|sofa|bed|wardrobe|shelf|lamp|carpet|mirror|furniture)\b/.test(t) || /(zimmer|küche|bad|wohnung|haus|tisch|stuhl|sofa|bett|schrank|regal|lampe|teppich|spiegel|möbel)/.test(w), "Home & rooms"],
+    [/\b(station|airport|school|library|museum|cinema|hospital|pharmacy|supermarket|market|shop|restaurant|hotel|park|beach|church|bank|street|city)\b/.test(t) || /(bahnhof|flughafen|schule|bibliothek|museum|kino|krankenhaus|apotheke|supermarkt|markt|laden|restaurant|hotel|park|strand|kirche|bank|straße|platz)/.test(w), "Places in the city"],
+    [/\b(food|drink|meal|breakfast|lunch|dinner|bread|cake|cheese|milk|egg|meat|soup|salad|fruit|vegetable|wine|beer|juice|water|coffee|tea|pizza|rice|hunger|thirst)\b/.test(t) || /(essen|trinken|frühstück|brot|kuchen|käse|milch|ei|fleisch|suppe|salat|obst|gemüse|wein|bier|saft|wasser|kaffee|tee|pizza|reis|hunger|durst)/.test(w), "Food & drink"],
+    [/\b(sport|football|basketball|volleyball|tennis|swimming|running|cycling|yoga|fitness|game|team|ball|training|leisure)\b/.test(t) || /(sport|fußball|basketball|volleyball|tennis|schwimmen|laufen|yoga|fitness|spiel|ball|training|freizeit)/.test(w), "Sports & leisure"],
+    [/\b(weather|rain|snow|sun|wind|cloud|storm|fog|ice|sky|moon|star|nature|mountain|lake|river|sea|forest|flower|tree|season|spring|summer|autumn|winter)\b/.test(t) || /(wetter|regen|schnee|sonne|wind|wolke|sturm|nebel|eis|himmel|mond|stern|natur|berg|see|fluss|meer|wald|blume|baum|jahreszeit|frühling|sommer|herbst|winter)/.test(w), "Weather & nature"],
+    [/\b(time|hour|minute|day|week|month|year|morning|evening|night|monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|holiday)\b/.test(t) || /(uhr|stunde|minute|tag|woche|monat|jahr|morgen|abend|nacht|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag|heute|feiertag)/.test(w), "Time & days"],
+    [/\b(money|euro|price|cost|bill|cash|credit|card|account|bank|ATM|salary|tax|currency)\b/.test(t) || /(geld|euro|preis|kosten|rechnung|kasse|kredit|karte|konto|bank|geldautomat|gehalt|steuer|währung)/.test(w), "Money & everyday items"],
   ];
   for (const [test, cat] of checks) { if (test) return cat; }
   return null;
 }
 
+// ── Word lookup ─────────────────────────────────────────────────────────────
 async function lookup() {
   const raw = document.getElementById('inp-de').value.trim();
   if (!raw) return;
-
   setLoading(true); hideResult(); setErr('');
   const word = raw.charAt(0).toUpperCase() + raw.slice(1);
 
   try {
     const res = await fetch(`${WORKER_URL}?word=${encodeURIComponent(word)}`);
-    if (!res.ok) throw new Error('Worker returned ' + res.status);
+    if (!res.ok) throw new Error('Worker error');
     const data = await res.json();
-
     if (data.error === 'not_found') {
       setErr(`"${word}" was not found. Check the spelling and try again.`);
-      setLoading(false);
-      return;
+      setLoading(false); return;
     }
-
     const article = data.article || null;
     const translation = data.translation || null;
     const cat = guessCategory(word, translation || '') || 'Uncategorised';
-
-    result = {
-      article: article || 'der',
-      word,
-      translation: translation || '',
-      category: cat,
-      confirmed: !!article,
-      noTranslation: !translation
-    };
-
+    result = { article: article || 'der', word, translation: translation || '', category: cat, confirmed: !!article, noTranslation: !translation };
     showResult(result);
   } catch(e) {
-    setErr('Lookup failed — please check your connection and try again.');
+    setErr('Lookup failed — please check your connection.');
   }
-
   setLoading(false);
 }
 
@@ -394,19 +435,16 @@ function showResult(r) {
   document.getElementById('r-word').textContent = r.word;
   document.getElementById('r-en').textContent = r.translation || '—';
   document.getElementById('r-cat').textContent = r.category || '';
-
   const parts = [];
   if (!r.confirmed) parts.push('⚠️ Gender not found — please verify');
   if (r.noTranslation) parts.push('Translation not found — please fill in');
   const noteEl = document.getElementById('r-note');
   noteEl.textContent = parts.join(' · ');
   noteEl.style.display = parts.length ? 'block' : 'none';
-
   document.getElementById('e-art').value = r.article; syncArtSel();
   document.getElementById('e-en').value = r.translation || '';
   document.getElementById('e-cat').value = r.category || '';
   updateCatSuggestions();
-
   document.getElementById('result-box').classList.add('on');
   document.getElementById('hint').style.display = 'none';
 }
@@ -443,48 +481,35 @@ function addWord() {
     setErr('"' + de + '" is already in your list.'); return;
   }
   words.push({ art, de, en, cat });
-  saveWords(); render(); discard();
+  scheduleSave(); render(); discard();
   toast('Added: ' + art + ' ' + de);
 }
 
-// ── Category rename ────────────────────────────────────────────────────────
+// ── Category rename ─────────────────────────────────────────────────────────
 function startEditCat(oldCat, labelEl, inputEl, editBtn, saveBtn) {
-  labelEl.style.display = 'none';
-  editBtn.style.display = 'none';
-  inputEl.style.display = 'inline-block';
-  inputEl.value = oldCat;
-  saveBtn.style.display = 'inline-block';
-  inputEl.focus();
-  inputEl.select();
+  labelEl.style.display = 'none'; editBtn.style.display = 'none';
+  inputEl.style.display = 'inline-block'; inputEl.value = oldCat;
+  saveBtn.style.display = 'inline-block'; inputEl.focus(); inputEl.select();
 }
 
 function saveEditCat(oldCat, inputEl, labelEl, editBtn, saveBtn) {
   const newCat = inputEl.value.trim();
-  if (!newCat || newCat === oldCat) {
-    cancelEditCat(oldCat, labelEl, inputEl, editBtn, saveBtn);
-    return;
-  }
-  // Rename all words in this category
+  if (!newCat || newCat === oldCat) { cancelEditCat(oldCat, labelEl, inputEl, editBtn, saveBtn); return; }
   words.forEach(w => { if (w.cat === oldCat) w.cat = newCat; });
-  saveWords();
-  inputEl.style.display = 'none';
-  saveBtn.style.display = 'none';
-  labelEl.textContent = newCat.toUpperCase();
-  labelEl.style.display = 'inline';
+  scheduleSave();
+  inputEl.style.display = 'none'; saveBtn.style.display = 'none';
+  labelEl.textContent = newCat; labelEl.style.display = 'inline';
   editBtn.style.display = '';
-  toast('Category renamed to "' + newCat + '"');
-  render();
+  toast('Category renamed to "' + newCat + '"'); render();
 }
 
 function cancelEditCat(oldCat, labelEl, inputEl, editBtn, saveBtn) {
-  inputEl.style.display = 'none';
-  saveBtn.style.display = 'none';
-  labelEl.style.display = 'inline';
-  editBtn.style.display = '';
+  inputEl.style.display = 'none'; saveBtn.style.display = 'none';
+  labelEl.style.display = 'inline'; editBtn.style.display = '';
 }
 
 function del(i) {
-  const w = words[i]; words.splice(i,1); saveWords(); render();
+  const w = words[i]; words.splice(i,1); scheduleSave(); render();
   toast('Removed: ' + w.de);
 }
 
@@ -531,26 +556,22 @@ function render() {
   });
 
   list.innerHTML = sorted.map(cat => {
-    const safeId = 'cat-' + cat.replace(/[^a-zA-Z0-9]/g, '_');
+    const sid = 'cat-' + cat.replace(/[^a-zA-Z0-9]/g,'_');
     return `
     <div class="category">
       <div class="cat-header">
-        <div class="cat-name-wrap" id="${safeId}-wrap">
-          <span class="cat-name" id="${safeId}-label">${cat}</span>
-          <input class="cat-name-input" id="${safeId}-input" type="text"
-            onkeydown="if(event.key==='Enter')document.getElementById('${safeId}-save').click(); if(event.key==='Escape')cancelEditCat('${cat}',document.getElementById('${safeId}-label'),this,document.getElementById('${safeId}-edit'),document.getElementById('${safeId}-save'))">
-          <button class="btn-edit-cat" id="${safeId}-edit"
-            onclick="startEditCat('${cat}',document.getElementById('${safeId}-label'),document.getElementById('${safeId}-input'),this,document.getElementById('${safeId}-save'))">
-            Edit
-          </button>
-          <button class="btn-save-cat" id="${safeId}-save"
-            onclick="saveEditCat('${cat}',document.getElementById('${safeId}-input'),document.getElementById('${safeId}-label'),document.getElementById('${safeId}-edit'),this)">
-            Save
-          </button>
+        <div class="cat-name-wrap">
+          <span class="cat-name" id="${sid}-label">${cat}</span>
+          <input class="cat-name-input" id="${sid}-input" type="text"
+            onkeydown="if(event.key==='Enter')document.getElementById('${sid}-save').click();if(event.key==='Escape')cancelEditCat('${cat}',document.getElementById('${sid}-label'),this,document.getElementById('${sid}-edit'),document.getElementById('${sid}-save'))">
+          <button class="btn-edit-cat" id="${sid}-edit"
+            onclick="startEditCat('${cat}',document.getElementById('${sid}-label'),document.getElementById('${sid}-input'),this,document.getElementById('${sid}-save'))">Edit</button>
+          <button class="btn-save-cat" id="${sid}-save"
+            onclick="saveEditCat('${cat}',document.getElementById('${sid}-input'),document.getElementById('${sid}-label'),document.getElementById('${sid}-edit'),this)">Save</button>
         </div>
         <div class="cat-count">${cats[cat].length} word${cats[cat].length!==1?'s':''}</div>
       </div>
-      <div class="words-grid">${cats[cat].map(w => `
+      <div class="words-grid">${cats[cat].map(w=>`
         <span class="pill p-${w.art}">
           <span class="pbadge b-${w.art}">${w.art}</span>
           <span class="pde">${w.de}</span>
@@ -562,7 +583,8 @@ function render() {
   }).join('');
 }
 
-render();
+// Start by loading from cloud
+loadFromCloud();
 </script>
 </body>
 </html>
